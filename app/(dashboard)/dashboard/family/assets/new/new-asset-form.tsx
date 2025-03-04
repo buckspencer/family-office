@@ -22,35 +22,42 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useActionState } from 'react';
-import { createAsset } from '@/app/(dashboard)/dashboard/family/assets/actions';
 import { useRouter } from 'next/navigation';
+import { createAsset } from '../actions';
+import { AssetType } from '@/lib/db/temp-schema/assets.types';
 
-const assetTypes = [
+const assetTypes: { value: AssetType; label: string }[] = [
   { value: 'property', label: 'Property' },
   { value: 'vehicle', label: 'Vehicle' },
   { value: 'investment', label: 'Investment' },
   { value: 'insurance', label: 'Insurance' },
   { value: 'other', label: 'Other' },
-] as const;
-
-type ActionState = {
-  error?: string;
-  success?: string;
-};
+];
 
 export default function NewAssetForm() {
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    createAsset,
-    { error: '', success: '' }
-  );
+  const [error, setError] = React.useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  React.useEffect(() => {
-    if (state.success) {
+  const handleSubmit = async (formData: FormData) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const result = await createAsset(formData);
+
+      if ('error' in result) {
+        throw new Error(result.error);
+      }
+
       router.push('/dashboard/family/assets');
+    } catch (error) {
+      console.error('Failed to create asset:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create asset');
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [state.success, router]);
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -59,7 +66,7 @@ export default function NewAssetForm() {
           <CardTitle>Add New Asset</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-6">
+          <form action={handleSubmit} className="space-y-6">
             <FormField
               name="name"
               render={({ field }) => (
@@ -116,7 +123,7 @@ export default function NewAssetForm() {
                     />
                   </FormControl>
                   <FormDescription>
-                    Brief description of the asset
+                    Provide a detailed description of the asset
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -127,19 +134,19 @@ export default function NewAssetForm() {
               name="value"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Value *</FormLabel>
+                  <FormLabel>Current Value *</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="Enter asset value"
+                      placeholder="Enter current value"
                       required
+                      min="0"
+                      step="0.01"
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    Current value of the asset
+                    Current estimated value of the asset
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -154,9 +161,6 @@ export default function NewAssetForm() {
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
-                  <FormDescription>
-                    Date when the asset was purchased
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -170,15 +174,12 @@ export default function NewAssetForm() {
                   <FormControl>
                     <Input
                       type="number"
-                      step="0.01"
-                      min="0"
                       placeholder="Enter purchase price"
+                      min="0"
+                      step="0.01"
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    Price paid for the asset
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -192,9 +193,6 @@ export default function NewAssetForm() {
                   <FormControl>
                     <Input placeholder="Enter asset location" {...field} />
                   </FormControl>
-                  <FormDescription>
-                    Physical location of the asset
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -216,16 +214,16 @@ export default function NewAssetForm() {
               )}
             />
 
-            {state.error && (
-              <div className="text-sm text-red-500">{state.error}</div>
+            {error && (
+              <div className="text-sm text-red-500">{error}</div>
             )}
 
             <div className="flex justify-end space-x-4">
               <Link href="/dashboard/family/assets">
                 <Button variant="outline">Cancel</Button>
               </Link>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving...' : 'Save Asset'}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save Asset'}
               </Button>
             </div>
           </form>

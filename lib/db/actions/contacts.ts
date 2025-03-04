@@ -1,8 +1,29 @@
+import { z } from 'zod';
 import { Contact, ContactCreate, ContactUpdate } from '@/lib/db/temp-schema/contacts.types';
+import { getUserWithTeam } from '@/lib/db/actions/users';
+import { validatedActionWithUser } from '@/lib/auth/middleware';
 
 // This will be replaced with actual database operations
 const contacts: Contact[] = [];
 
+// Validation schemas
+export const contactSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  type: z.enum(['family', 'medical', 'financial', 'legal', 'service', 'other'], {
+    required_error: 'Contact type is required',
+  }),
+  relationship: z.string().min(1, 'Relationship is required'),
+  email: z.string().email().optional().or(z.literal('')),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const contactUpdateSchema = contactSchema.extend({
+  id: z.number(),
+});
+
+// Database operations with auth checks
 export async function getContactsByTeam(teamId: number): Promise<Contact[]> {
   return contacts.filter(contact => contact.teamId === teamId);
 }
@@ -19,33 +40,79 @@ export async function getContactsByTeamAndType(teamId: number, type: Contact['ty
   return contacts.filter(contact => contact.teamId === teamId && contact.type === type);
 }
 
-export async function createContact(data: ContactCreate): Promise<Contact> {
-  const newContact: Contact = {
-    id: contacts.length + 1,
-    ...data,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  contacts.push(newContact);
-  return newContact;
-}
+// Server actions with validation and auth
+export const createContact = validatedActionWithUser(
+  contactSchema,
+  async (data, _, user) => {
+    const userWithTeam = await getUserWithTeam(user.id);
+    if (!userWithTeam?.teamId) {
+      throw new Error('User is not associated with a team.');
+    }
 
-export async function updateContact(id: number, data: ContactUpdate): Promise<Contact | null> {
-  const index = contacts.findIndex(contact => contact.id === id);
-  if (index === -1) return null;
+    try {
+      const newContact: Contact = {
+        id: contacts.length + 1,
+        ...data,
+        teamId: userWithTeam.teamId,
+        userId: user.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      contacts.push(newContact);
+      return { data: newContact, message: 'Contact created successfully.' };
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to create contact.');
+    }
+  }
+);
 
-  contacts[index] = {
-    ...contacts[index],
-    ...data,
-    updatedAt: new Date(),
-  };
-  return contacts[index];
-}
+export const updateContact = validatedActionWithUser(
+  contactUpdateSchema,
+  async (data, _, user) => {
+    const userWithTeam = await getUserWithTeam(user.id);
+    if (!userWithTeam?.teamId) {
+      throw new Error('User is not associated with a team.');
+    }
 
-export async function deleteContact(id: number): Promise<boolean> {
-  const index = contacts.findIndex(contact => contact.id === id);
-  if (index === -1) return false;
+    const { id, ...updateData } = data;
+    const index = contacts.findIndex(contact => contact.id === id && contact.teamId === userWithTeam.teamId);
+    
+    if (index === -1) {
+      throw new Error('Contact not found or access denied.');
+    }
 
-  contacts.splice(index, 1);
-  return true;
-} 
+    try {
+      contacts[index] = {
+        ...contacts[index],
+        ...updateData,
+        updatedAt: new Date(),
+      };
+      return { data: contacts[index], message: 'Contact updated successfully.' };
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to update contact.');
+    }
+  }
+);
+
+export const deleteContact = validatedActionWithUser(
+  z.object({ id: z.number() }),
+  async (data, _, user) => {
+    const userWithTeam = await getUserWithTeam(user.id);
+    if (!userWithTeam?.teamId) {
+      throw new Error('User is not associated with a team.');
+    }
+
+    const index = contacts.findIndex(contact => contact.id === data.id && contact.teamId === userWithTeam.teamId);
+    
+    if (index === -1) {
+      throw new Error('Contact not found or access denied.');
+    }
+
+    try {
+      contacts.splice(index, 1);
+      return { message: 'Contact deleted successfully.' };
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to delete contact.');
+    }
+  }
+); 

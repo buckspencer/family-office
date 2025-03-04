@@ -22,9 +22,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useActionState } from 'react';
-import { createContact } from '../actions';
 import { useRouter } from 'next/navigation';
+import { createContact } from '../actions';
 
 const contactTypes = [
   { value: 'family', label: 'Family Member' },
@@ -35,23 +34,30 @@ const contactTypes = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-type ActionState = {
-  error?: string;
-  success?: string;
-};
-
 export default function NewContactForm() {
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    createContact,
-    { error: '', success: '' }
-  );
+  const [error, setError] = React.useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  React.useEffect(() => {
-    if (state.success) {
+  const handleSubmit = async (formData: FormData) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const result = await createContact(formData);
+
+      if ('error' in result) {
+        throw new Error(result.error);
+      }
+
       router.push('/dashboard/family/contacts');
+    } catch (error) {
+      console.error('Failed to create contact:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create contact');
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [state.success, router]);
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -60,7 +66,7 @@ export default function NewContactForm() {
           <CardTitle>Add New Contact</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-6">
+          <form action={handleSubmit} className="space-y-6">
             <FormField
               name="name"
               render={({ field }) => (
@@ -126,11 +132,8 @@ export default function NewContactForm() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="Enter email address" {...field} />
+                    <Input type="email" placeholder="contact@example.com" {...field} />
                   </FormControl>
-                  <FormDescription>
-                    Contact's email address (optional)
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -142,11 +145,8 @@ export default function NewContactForm() {
                 <FormItem>
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
-                    <Input type="tel" placeholder="Enter phone number" {...field} />
+                    <Input type="tel" placeholder="(555) 123-4567" {...field} />
                   </FormControl>
-                  <FormDescription>
-                    Contact's phone number (optional)
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -159,13 +159,10 @@ export default function NewContactForm() {
                   <FormLabel>Address</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Enter full address"
+                      placeholder="Enter contact's address"
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    Contact's full address (optional)
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -187,16 +184,16 @@ export default function NewContactForm() {
               )}
             />
 
-            {state.error && (
-              <div className="text-sm text-red-500">{state.error}</div>
+            {error && (
+              <div className="text-sm text-red-500">{error}</div>
             )}
 
             <div className="flex justify-end space-x-4">
               <Link href="/dashboard/family/contacts">
                 <Button variant="outline">Cancel</Button>
               </Link>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving...' : 'Save Contact'}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save Contact'}
               </Button>
             </div>
           </form>
