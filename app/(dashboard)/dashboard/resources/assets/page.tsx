@@ -3,11 +3,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowLeft } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AssetCard } from '@/components/ui/asset-card';
 import { Asset } from '@/lib/db/temp-schema/assets.types';
 import { getAssets } from './actions';
+import { BackButton } from '@/components/ui/back-button';
 
 export default function AssetsPage() {
   const [assets, setAssets] = React.useState<Asset[]>([]);
@@ -28,18 +29,14 @@ export default function AssetsPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <Link href="/dashboard/family">
-          <Button variant="ghost" size="sm" className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Family Dashboard
-          </Button>
-        </Link>
-      </div>
+      <BackButton 
+        href="/dashboard/resources" 
+        label="Back to Resources Dashboard"
+      />
 
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Assets</h1>
-        <Link href="/dashboard/family/assets/new">
+        <Link href="/dashboard/resources/assets/new">
           <Button>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add New Asset

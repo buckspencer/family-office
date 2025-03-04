@@ -7,6 +7,7 @@ import { PlusCircle, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionCard } from '@/components/ui/subscription-card';
 import { Subscription } from '@/lib/db/temp-schema/subscriptions.types';
+import { BackButton } from '@/components/ui/back-button';
 
 // Mock data for development
 const mockSubscriptions: Subscription[] = [
@@ -49,14 +50,10 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <Link href="/dashboard/resources">
-          <Button variant="ghost" size="sm" className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Resources Dashboard
-          </Button>
-        </Link>
-      </div>
+      <BackButton 
+        href="/dashboard/resources" 
+        label="Back to Resources Dashboard"
+      />
 
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Subscriptions</h1>

@@ -35,18 +35,6 @@ function Header() {
           <span className="ml-2 text-xl font-semibold text-gray-900">Family</span>
         </Link>
         <div className="flex items-center space-x-4">
-          <Link
-            href="/pricing"
-            className="text-sm font-medium text-gray-700 hover:text-gray-900"
-          >
-            Upgrade Account
-          </Link>
-          <Link
-            href="/sample-dashboard"
-            className="text-sm font-medium text-gray-700 hover:text-gray-900"
-          >
-            Family Summary
-          </Link>
           {user ? (
             <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
               <DropdownMenuTrigger>
