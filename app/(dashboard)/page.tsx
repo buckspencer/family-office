@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, CreditCard, Key, Calendar } from 'lucide-react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
+import { PricingSection } from '@/components/pricing/pricing-section';
 export default function HomePage() {
   return (
     <main>
@@ -93,7 +93,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+      <PricingSection />
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-center">
