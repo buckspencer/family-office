@@ -1,65 +1,91 @@
+'use client';
+
+import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { PlusCircle, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getSubscriptionsByTeam } from '@/lib/db/actions/subscriptions';
-import { getUserWithTeam } from '@/lib/db/actions/users';
 import { SubscriptionCard } from '@/components/ui/subscription-card';
-import { validatedActionWithUser } from '@/lib/auth/middleware';
 import { Subscription } from '@/lib/db/temp-schema/subscriptions.types';
-import { z } from 'zod';
 
-const emptySchema = z.object({});
+// Mock data for development
+const mockSubscriptions: Subscription[] = [
+  {
+    id: 1,
+    name: 'Netflix',
+    type: 'service',
+    description: 'Streaming service for movies and TV shows',
+    amount: 19.99,
+    billingFrequency: 'monthly',
+    startDate: new Date('2024-01-01'),
+    autoRenew: true,
+    category: 'Entertainment',
+    notes: 'Family plan with 4K streaming',
+    teamId: 1,
+    userId: 1,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 2,
+    name: 'Amazon Prime',
+    type: 'subscription',
+    description: 'Shopping and entertainment subscription',
+    amount: 139,
+    billingFrequency: 'yearly',
+    startDate: new Date('2024-01-15'),
+    autoRenew: true,
+    category: 'Shopping',
+    notes: 'Includes Prime Video and free shipping',
+    teamId: 1,
+    userId: 1,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
 
-async function getSubscriptions() {
-  const result = await validatedActionWithUser(
-    emptySchema,
-    async (_, __, user) => {
-      const userWithTeam = await getUserWithTeam(user.id);
-      if (!userWithTeam?.teamId) {
-        return { error: 'User is not associated with a team.' };
-      }
-      const subscriptions = await getSubscriptionsByTeam(userWithTeam.teamId);
-      return { subscriptions };
-    }
-  )({}, new FormData());
-
-  if ('error' in result) {
-    return [] as Subscription[];
-  }
-
-  return result.subscriptions as Subscription[];
-}
-
-export default async function SubscriptionsPage() {
-  const subscriptions = await getSubscriptions();
+export default function SubscriptionsPage() {
+  const [subscriptions, setSubscriptions] = React.useState<Subscription[]>(mockSubscriptions);
 
   return (
     <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <Link href="/dashboard/family">
+          <Button variant="ghost" size="sm" className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Family Dashboard
+          </Button>
+        </Link>
+      </div>
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Subscriptions</h1>
         <Link href="/dashboard/family/subscriptions/new">
-          <Button>Add New Subscription</Button>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add New Subscription
+          </Button>
         </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subscriptions.map((subscription) => (
-          <SubscriptionCard key={subscription.id} subscription={subscription} />
-        ))}
+        {subscriptions.length === 0 ? (
+          <Card className="col-span-full">
+            <CardHeader>
+              <CardTitle>No Subscriptions Found</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                You haven&apos;t added any subscriptions yet. Click the button above to add your first subscription.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          subscriptions.map((subscription) => (
+            <SubscriptionCard key={subscription.id} subscription={subscription} />
+          ))
+        )}
       </div>
-
-      {subscriptions.length === 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>No Subscriptions Found</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              You haven&apos;t added any subscriptions yet. Click the button above to add your first subscription.
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 } 

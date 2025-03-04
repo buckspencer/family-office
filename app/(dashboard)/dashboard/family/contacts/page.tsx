@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, ArrowLeft } from 'lucide-react';
 import { ContactCard } from '@/components/ui/contact-card';
 import { Contact } from '@/lib/db/temp-schema/contacts.types';
 import { getContacts, deleteContact } from './actions';
@@ -52,6 +52,15 @@ export default function ContactsPage() {
 
   return (
     <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <Link href="/dashboard/family">
+          <Button variant="ghost" size="sm" className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Family Dashboard
+          </Button>
+        </Link>
+      </div>
+      
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Contacts</h1>
         <Link href="/dashboard/family/contacts/new">

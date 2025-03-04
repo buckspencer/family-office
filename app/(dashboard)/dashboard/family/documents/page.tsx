@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { PlusCircle, ArrowLeft } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -32,6 +33,15 @@ const documents = [
 export default function DocumentsPage() {
   return (
     <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <Link href="/dashboard/family">
+          <Button variant="ghost" size="sm" className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Family Dashboard
+          </Button>
+        </Link>
+      </div>
+
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Family Documents</h1>
@@ -40,7 +50,10 @@ export default function DocumentsPage() {
           </p>
         </div>
         <Link href="/dashboard/family/documents/new">
-          <Button>Add Document</Button>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Document
+          </Button>
         </Link>
       </div>
 
