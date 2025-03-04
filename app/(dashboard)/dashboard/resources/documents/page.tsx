@@ -34,10 +34,10 @@ export default function DocumentsPage() {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <Link href="/dashboard/family">
+        <Link href="/dashboard/resources">
           <Button variant="ghost" size="sm" className="mb-4">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Family Dashboard
+            Back to Resources Dashboard
           </Button>
         </Link>
       </div>
@@ -49,7 +49,7 @@ export default function DocumentsPage() {
             Manage and organize your important family documents
           </p>
         </div>
-        <Link href="/dashboard/family/documents/new">
+        <Link href="/dashboard/resources/documents/new">
           <Button>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Document

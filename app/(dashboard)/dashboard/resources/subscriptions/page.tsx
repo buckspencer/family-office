@@ -50,17 +50,17 @@ export default function SubscriptionsPage() {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <Link href="/dashboard/family">
+        <Link href="/dashboard/resources">
           <Button variant="ghost" size="sm" className="mb-4">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Family Dashboard
+            Back to Resources Dashboard
           </Button>
         </Link>
       </div>
 
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Subscriptions</h1>
-        <Link href="/dashboard/family/subscriptions/new">
+        <Link href="/dashboard/resources/subscriptions/new">
           <Button>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add New Subscription

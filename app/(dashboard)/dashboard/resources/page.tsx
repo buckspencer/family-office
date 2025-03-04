@@ -9,7 +9,7 @@ export default function FamilyManagementPage() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Documents Section */}
-        <Link href="/dashboard/family/documents">
+        <Link href="/dashboard/resources/documents">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Documents</CardTitle>
@@ -24,7 +24,7 @@ export default function FamilyManagementPage() {
         </Link>
 
         {/* Contacts Section */}
-        <Link href="/dashboard/family/contacts">
+        <Link href="/dashboard/resources/contacts">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Contacts</CardTitle>
@@ -39,7 +39,7 @@ export default function FamilyManagementPage() {
         </Link>
 
         {/* Assets Section */}
-        <Link href="/dashboard/family/assets">
+        <Link href="/dashboard/resources/assets">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Assets</CardTitle>
@@ -54,7 +54,7 @@ export default function FamilyManagementPage() {
         </Link>
 
         {/* Subscriptions Section */}
-        <Link href="/dashboard/family/subscriptions">
+        <Link href="/dashboard/resources/subscriptions">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Subscriptions</CardTitle>
@@ -69,7 +69,7 @@ export default function FamilyManagementPage() {
         </Link>
 
         {/* Events Section */}
-        <Link href="/dashboard/family/events">
+        <Link href="/dashboard/resources/events">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Events</CardTitle>

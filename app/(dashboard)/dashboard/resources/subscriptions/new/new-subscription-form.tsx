@@ -22,62 +22,40 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { useActionState } from 'react';
-import { createEvent } from '@/lib/db/actions/events';
+import { createSubscription } from '../actions';
 import { useRouter } from 'next/navigation';
-// @ts-ignore - Using temp-schema
-import { Event } from '@/lib/db/temp-schema/events.types';
 
-const eventTypes = [
-  { value: 'birthday', label: 'Birthday' },
-  { value: 'anniversary', label: 'Anniversary' },
-  { value: 'holiday', label: 'Holiday' },
-  { value: 'reminder', label: 'Reminder' },
+const subscriptionTypes = [
+  { value: 'service', label: 'Service' },
+  { value: 'membership', label: 'Membership' },
+  { value: 'subscription', label: 'Subscription' },
   { value: 'other', label: 'Other' },
 ] as const;
 
+const billingFrequencies = [
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly', label: 'Yearly' },
+  { value: 'one-time', label: 'One-time' },
+] as const;
+
 type ActionState = {
-  success: boolean;
-  data?: Event;
   error?: string;
+  success?: string;
 };
 
-// Temporary function to handle form data transformation
-async function handleCreateEvent(state: ActionState, formData: FormData): Promise<ActionState> {
-  const startDateStr = formData.get('startDate') as string;
-  const endDateStr = formData.get('endDate') as string;
-
-  const data = {
-    title: formData.get('title') as string,
-    type: formData.get('type') as 'birthday' | 'anniversary' | 'holiday' | 'reminder' | 'other',
-    description: formData.get('description') as string,
-    startDate: new Date(startDateStr),
-    endDate: endDateStr ? new Date(endDateStr) : undefined,
-    location: formData.get('location') as string,
-    notes: formData.get('notes') as string,
-    // Temporary values for development
-    teamId: 1,
-    userId: 1,
-  };
-
-  const result = await createEvent(data);
-  return {
-    success: result.success,
-    data: result.data || undefined,
-    error: result.error
-  };
-}
-
-export default function NewEventForm() {
+export default function NewSubscriptionForm() {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    handleCreateEvent,
-    { success: false }
+    createSubscription,
+    { error: '', success: '' }
   );
 
   React.useEffect(() => {
     if (state.success) {
-      router.push('/dashboard/family/events');
+      router.push('/dashboard/resources/subscriptions');
     }
   }, [state.success, router]);
 
@@ -85,20 +63,20 @@ export default function NewEventForm() {
     <div className="container mx-auto p-6">
       <Card>
         <CardHeader>
-          <CardTitle>Add New Event</CardTitle>
+          <CardTitle>Add New Subscription</CardTitle>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-6">
             <FormField
-              name="title"
+              name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title *</FormLabel>
+                  <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter event title" required {...field} />
+                    <Input placeholder="Enter subscription name" required {...field} />
                   </FormControl>
                   <FormDescription>
-                    Name of the event
+                    Name of the subscription
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -109,7 +87,7 @@ export default function NewEventForm() {
               name="type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Event Type *</FormLabel>
+                  <FormLabel>Subscription Type *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value} required>
                     <FormControl>
                       <SelectTrigger>
@@ -117,7 +95,7 @@ export default function NewEventForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {eventTypes.map((type) => (
+                      {subscriptionTypes.map((type) => (
                         <SelectItem key={type.value} value={type.value}>
                           {type.label}
                         </SelectItem>
@@ -125,7 +103,7 @@ export default function NewEventForm() {
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    Choose the type of event
+                    Choose the type of subscription
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -136,15 +114,66 @@ export default function NewEventForm() {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>Description *</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Describe the event"
+                      placeholder="Describe the subscription"
+                      required
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    Brief description of the event
+                    Brief description of the subscription
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Amount *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Enter subscription amount"
+                      required
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Cost of the subscription
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              name="billingFrequency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Billing Frequency *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} required>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select billing frequency" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {billingFrequencies.map((frequency) => (
+                        <SelectItem key={frequency.value} value={frequency.value}>
+                          {frequency.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    How often you are billed
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -157,10 +186,10 @@ export default function NewEventForm() {
                 <FormItem>
                   <FormLabel>Start Date *</FormLabel>
                   <FormControl>
-                    <Input type="datetime-local" required {...field} />
+                    <Input type="date" required {...field} />
                   </FormControl>
                   <FormDescription>
-                    When the event starts
+                    When the subscription starts
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -173,10 +202,10 @@ export default function NewEventForm() {
                 <FormItem>
                   <FormLabel>End Date</FormLabel>
                   <FormControl>
-                    <Input type="datetime-local" {...field} />
+                    <Input type="date" {...field} />
                   </FormControl>
                   <FormDescription>
-                    When the event ends (if applicable)
+                    When the subscription ends (if applicable)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -184,15 +213,35 @@ export default function NewEventForm() {
             />
 
             <FormField
-              name="location"
+              name="autoRenew"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Auto-renew</FormLabel>
+                    <FormDescription>
+                      Automatically renew the subscription
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              name="category"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Location</FormLabel>
+                  <FormLabel>Category</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter event location" {...field} />
+                    <Input placeholder="Enter category (e.g., Entertainment, Software)" {...field} />
                   </FormControl>
                   <FormDescription>
-                    Where the event takes place
+                    Category for organizing subscriptions
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -206,7 +255,7 @@ export default function NewEventForm() {
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Add any additional notes about this event"
+                      placeholder="Add any additional notes about this subscription"
                       {...field}
                     />
                   </FormControl>
@@ -220,11 +269,11 @@ export default function NewEventForm() {
             )}
 
             <div className="flex justify-end space-x-4">
-              <Link href="/dashboard/family/events">
+              <Link href="/dashboard/resources/subscriptions">
                 <Button variant="outline">Cancel</Button>
               </Link>
               <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving...' : 'Save Event'}
+                {isPending ? 'Saving...' : 'Save Subscription'}
               </Button>
             </div>
           </form>

@@ -41,7 +41,7 @@ export async function createEvent(data: EventCreate & { teamId: number; userId: 
       updatedAt: new Date(),
     };
     events.push(newEvent);
-    revalidatePath('/dashboard/family/events');
+    revalidatePath('/dashboard/resources/events');
     return { success: true, data: newEvent };
   } catch (error) {
     console.error('Error creating event:', error);
@@ -90,7 +90,7 @@ export async function updateEvent(id: number, data: EventUpdate): Promise<Action
       updatedAt: new Date(),
     };
 
-    revalidatePath('/dashboard/family/events');
+    revalidatePath('/dashboard/resources/events');
     return { success: true, data: events[eventIndex] };
   } catch (error) {
     console.error('Error updating event:', error);
@@ -107,7 +107,7 @@ export async function deleteEvent(id: number): Promise<ActionResponse<Event | nu
 
     const deletedEvent = events[eventIndex];
     events.splice(eventIndex, 1);
-    revalidatePath('/dashboard/family/events');
+    revalidatePath('/dashboard/resources/events');
     return { success: true, data: deletedEvent };
   } catch (error) {
     console.error('Error deleting event:', error);

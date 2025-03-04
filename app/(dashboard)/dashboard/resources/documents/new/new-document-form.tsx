@@ -49,7 +49,7 @@ export default function NewDocumentForm() {
             Add a new document to your family records
           </p>
         </div>
-        <Link href="/dashboard/family/documents">
+        <Link href="/dashboard/resources/documents">
           <Button variant="outline">Cancel</Button>
         </Link>
       </div>
@@ -152,7 +152,7 @@ export default function NewDocumentForm() {
             />
 
             <div className="flex justify-end space-x-4">
-              <Link href="/dashboard/family/documents">
+              <Link href="/dashboard/resources/documents">
                 <Button variant="outline">Cancel</Button>
               </Link>
               <Button type="submit">Save Document</Button>
