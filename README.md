@@ -6,6 +6,58 @@ This is a starter template for building a SaaS application using **Next.js** wit
 
 **Demo: [https://next-saas-start.vercel.app/](https://next-saas-start.vercel.app/)**
 
+## Family Office Application Status
+
+### Current Features
+- ✅ User authentication and team management
+- ✅ Basic dashboard layout
+- ✅ Wizard UI for data entry
+- ✅ Form components for different data types
+- ✅ State management with Zustand
+- ✅ Basic navigation and routing
+
+### MVP Requirements
+
+#### Database Integration
+- [ ] Create database tables for:
+  - [ ] Documents (title, description, file_url, created_at, updated_at)
+  - [ ] Contacts (name, email, phone, created_at, updated_at)
+  - [ ] Events (title, date, description, created_at, updated_at)
+  - [ ] Subscriptions (service_name, cost, renewal_date, created_at, updated_at)
+- [ ] Set up database migrations
+- [ ] Implement database queries and mutations
+- [ ] Add proper error handling for database operations
+
+#### Data Entry Wizard
+- [ ] Implement data validation for all form fields
+- [ ] Add file upload functionality for documents
+- [ ] Connect form submissions to database
+- [ ] Add success/error notifications
+- [ ] Implement proper error handling
+- [ ] Add loading states during submissions
+
+#### Dashboard Features
+- [ ] Display lists of entered data (documents, contacts, events, subscriptions)
+- [ ] Add search and filtering capabilities
+- [ ] Implement sorting options
+- [ ] Add pagination for large datasets
+- [ ] Create detailed view pages for each data type
+
+#### Additional Features
+- [ ] Add data export functionality
+- [ ] Implement data import capabilities
+- [ ] Add user activity logging
+- [ ] Create notification system for upcoming events/renewals
+- [ ] Add data visualization for subscriptions and costs
+
+### Future Enhancements
+- Voice input for data entry
+- API integrations for automatic data import
+- Advanced analytics and reporting
+- Mobile app version
+- Multi-language support
+- Advanced search with full-text capabilities
+
 ## Features
 
 - Marketing landing page (`/`) with animated Terminal element

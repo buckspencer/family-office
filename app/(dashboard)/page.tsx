@@ -3,6 +3,8 @@ import { ArrowRight, CreditCard, Key, Calendar } from 'lucide-react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PricingSection } from '@/components/pricing/pricing-section';
+import { WizardCard } from '@/components/dashboard/WizardCard';
+
 export default function HomePage() {
   return (
     <main>
@@ -42,6 +44,10 @@ export default function HomePage() {
 
       <section className="py-16 bg-white w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <WizardCard />
+            {/* Add more quick action cards here */}
+          </div>
           <div className="lg:grid lg:grid-cols-3 lg:gap-8">
             <div>
               <div className="flex items-center justify-center h-12 w-12 rounded-md bg-orange-500 text-white">

@@ -15,8 +15,9 @@ import {
   AlertCircle,
   Plus,
   Search,
+  PlusCircle,
 } from "lucide-react";
-
+import Link from "next/link";
 export default function Dashboard() {
   // Mock data - in a real app this would come from your backend
   const subscriptions = [
@@ -88,14 +89,19 @@ export default function Dashboard() {
           <p className="text-gray-500">Welcome back, Spencer Family</p>
         </div>
         <div className="flex space-x-4">
-          <Button variant="outline" className="flex items-center">
+          {/* <Button variant="outline" className="flex items-center">
             <Search className="h-4 w-4 mr-2" />
             Search
-          </Button>
-          <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Add New
-          </Button>
+          </Button> */}
+          <Button
+                asChild
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                <Link href="/wizard">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add Data
+                </Link>
+              </Button>
         </div>
       </div>
 
