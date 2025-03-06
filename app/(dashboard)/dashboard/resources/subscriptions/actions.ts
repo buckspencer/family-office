@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { validatedActionWithUser } from '@/lib/auth/middleware';
 import { getUserWithTeam } from '@/lib/db/actions/users';
 import { createSubscription as createSubscriptionAction } from '@/lib/db/actions/subscriptions';
+import { SubscriptionCreate, Subscription } from '@/lib/db/temp-schema/subscriptions.types';
+import { createSubscription as createSubscriptionDb } from '@/lib/db/actions/subscriptions';
 
 const subscriptionSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -33,6 +35,7 @@ export const createSubscription = validatedActionWithUser(
     try {
       const newSubscription = await createSubscriptionAction({
         ...data,
+        status: 'active',
         startDate: new Date(data.startDate),
         endDate: data.endDate ? new Date(data.endDate) : undefined,
         teamId: userWithTeam.teamId,
@@ -44,4 +47,15 @@ export const createSubscription = validatedActionWithUser(
       return { error: error instanceof Error ? error.message : 'Failed to create subscription.' };
     }
   }
-); 
+);
+
+export async function handleCreateSubscription(data: SubscriptionCreate & { teamId: number; userId: number }): Promise<Subscription> {
+  const newSubscription = await createSubscriptionDb({
+    ...data,
+    status: 'active',
+    teamId: data.teamId,
+    userId: data.userId,
+  });
+  
+  return newSubscription;
+} 

@@ -13,6 +13,7 @@ const subscriptions: Subscription[] = [
     autoRenew: true,
     category: 'Entertainment',
     notes: 'Family plan with 4 screens',
+    status: 'active',
     teamId: 1,
     userId: 1,
     createdAt: new Date('2024-01-01'),
@@ -30,6 +31,7 @@ const subscriptions: Subscription[] = [
     autoRenew: true,
     category: 'Health & Fitness',
     notes: 'Includes personal training sessions',
+    status: 'active',
     teamId: 1,
     userId: 1,
     createdAt: new Date('2024-01-01'),
@@ -46,6 +48,7 @@ const subscriptions: Subscription[] = [
     autoRenew: true,
     category: 'Software',
     notes: 'All apps included',
+    status: 'active',
     teamId: 1,
     userId: 1,
     createdAt: new Date('2024-01-01'),
@@ -62,6 +65,7 @@ const subscriptions: Subscription[] = [
     autoRenew: true,
     category: 'Shopping',
     notes: 'Includes Prime Video and Music',
+    status: 'active',
     teamId: 1,
     userId: 1,
     createdAt: new Date('2024-01-01'),
@@ -78,6 +82,7 @@ const subscriptions: Subscription[] = [
     autoRenew: true,
     category: 'Entertainment',
     notes: 'Family plan with 6 accounts',
+    status: 'active',
     teamId: 1,
     userId: 1,
     createdAt: new Date('2024-01-01'),
@@ -120,6 +125,7 @@ export async function createSubscription(data: SubscriptionCreate & { teamId: nu
   const newSubscription: Subscription = {
     id: subscriptions.length + 1,
     ...data,
+    status: 'active',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -139,6 +145,7 @@ export async function updateSubscription(id: number, data: SubscriptionUpdate): 
   subscriptions[subscriptionIndex] = {
     ...subscriptions[subscriptionIndex],
     ...data,
+    status: 'active',
     updatedAt: new Date(),
   };
 

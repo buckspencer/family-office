@@ -2,6 +2,8 @@ export type SubscriptionType = 'service' | 'membership' | 'subscription' | 'othe
 
 export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
 
+export type SubscriptionStatus = 'active' | 'cancelled' | 'pending' | 'failed';
+
 export interface Subscription {
   id: number;
   name: string;
@@ -14,6 +16,13 @@ export interface Subscription {
   autoRenew: boolean;
   category?: string;
   notes?: string;
+  paymentMethod?: string;
+  lastBilled?: Date;
+  nextBilling?: Date;
+  status: SubscriptionStatus;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
   teamId: number;
   userId: number;
   createdAt: Date;
@@ -31,6 +40,15 @@ export interface SubscriptionCreate {
   autoRenew: boolean;
   category?: string;
   notes?: string;
+  paymentMethod?: string;
+  lastBilled?: Date;
+  nextBilling?: Date;
+  status: SubscriptionStatus;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
+  teamId: number;
+  userId: number;
 }
 
 export interface SubscriptionUpdate {
@@ -44,4 +62,11 @@ export interface SubscriptionUpdate {
   autoRenew?: boolean;
   category?: string;
   notes?: string;
+  paymentMethod?: string;
+  lastBilled?: Date;
+  nextBilling?: Date;
+  status?: SubscriptionStatus;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
 } 

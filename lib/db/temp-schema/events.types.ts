@@ -9,6 +9,12 @@ export interface Event {
   endDate?: Date;
   location?: string;
   notes?: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
+  reminderBefore?: number;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
   teamId: number;
   userId: number;
   createdAt: Date;
@@ -23,6 +29,12 @@ export interface EventCreate {
   endDate?: Date;
   location?: string;
   notes?: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
+  reminderBefore?: number;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
   teamId: number;
   userId: number;
 }
@@ -35,6 +47,12 @@ export interface EventUpdate {
   endDate?: Date;
   location?: string;
   notes?: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
+  reminderBefore?: number;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
 }
 
 // Temp data
@@ -48,6 +66,9 @@ export const events: Event[] = [
     endDate: new Date('2024-07-20'),
     location: 'Beach House, Malibu',
     notes: 'Bring sunscreen and beach gear',
+    isRecurring: true,
+    recurrenceRule: 'FREQ=YEARLY',
+    reminderBefore: 7 * 24 * 60, // 7 days in minutes
     teamId: 1,
     userId: 1,
     createdAt: new Date(),
@@ -61,6 +82,9 @@ export const events: Event[] = [
     startDate: new Date('2024-05-10'),
     location: 'Home',
     notes: 'Order cake and decorations',
+    isRecurring: true,
+    recurrenceRule: 'FREQ=YEARLY',
+    reminderBefore: 2 * 24 * 60, // 2 days in minutes
     teamId: 1,
     userId: 1,
     createdAt: new Date(),
@@ -74,6 +98,9 @@ export const events: Event[] = [
     startDate: new Date('2024-08-25'),
     location: 'Restaurant',
     notes: 'Make dinner reservations',
+    isRecurring: true,
+    recurrenceRule: 'FREQ=YEARLY',
+    reminderBefore: 3 * 24 * 60, // 3 days in minutes
     teamId: 1,
     userId: 1,
     createdAt: new Date(),
@@ -87,6 +114,8 @@ export const events: Event[] = [
     startDate: new Date('2024-06-15T10:00:00'),
     location: 'Medical Center',
     notes: 'Bring insurance card',
+    isRecurring: false,
+    reminderBefore: 60, // 1 hour in minutes
     teamId: 1,
     userId: 1,
     createdAt: new Date(),

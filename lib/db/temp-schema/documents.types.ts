@@ -5,6 +5,13 @@ export interface DocumentCreate {
   expiryDate?: Date;
   notes?: string;
   fileUrl: string;
+  fileSize?: number;
+  fileType?: string;
+  isEncrypted?: boolean;
+  lastAccessed?: Date;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
   teamId: number;
   userId: number;
 }
@@ -14,6 +21,13 @@ export interface DocumentUpdate {
   category?: string;
   expiryDate?: Date;
   notes?: string;
+  fileSize?: number;
+  fileType?: string;
+  isEncrypted?: boolean;
+  lastAccessed?: Date;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
 }
 
 // This will be generated from the schema

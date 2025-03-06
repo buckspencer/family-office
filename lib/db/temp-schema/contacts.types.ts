@@ -7,6 +7,9 @@ export interface ContactCreate {
   phone?: string;
   address?: string;
   notes?: string;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
   teamId: number;
   userId: number;
 }
@@ -19,6 +22,9 @@ export interface ContactUpdate {
   phone?: string;
   address?: string;
   notes?: string;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
 }
 
 // This will be generated from the schema
