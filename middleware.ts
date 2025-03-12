@@ -1,48 +1,78 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { signToken, verifyToken } from '@/lib/auth/session';
-
-const protectedRoutes = '/dashboard';
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('session');
-  const isProtectedRoute = pathname.startsWith(protectedRoutes);
-
-  if (isProtectedRoute && !sessionCookie) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
+  console.log('Middleware executing for path:', request.nextUrl.pathname);
+  
+  // Create a response object
+  const res = NextResponse.next();
+  
+  // Create a Supabase client configured to use cookies
+  const supabase = createMiddlewareClient({ req: request, res });
+  
+  // Refresh session if expired - required for Server Components
+  const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+  
+  console.log('Middleware: Supabase session check result:', {
+    hasSession: !!supabaseSession,
+    user: supabaseSession?.user?.email || 'none',
+    expires: supabaseSession?.expires_at ? new Date(supabaseSession.expires_at * 1000).toISOString() : 'none'
+  });
+  
+  // Check if the request is for a protected route
+  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard');
+  
+  // Allow access to test-auth page without authentication
+  if (request.nextUrl.pathname === '/test-auth') {
+    console.log('Middleware: Allowing access to test-auth page');
+    return res;
   }
-
-  let res = NextResponse.next();
-
-  if (sessionCookie) {
-    try {
-      const parsed = await verifyToken(sessionCookie.value);
-      const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      res.cookies.set({
-        name: 'session',
-        value: await signToken({
-          ...parsed,
-          expires: expiresInOneDay.toISOString(),
-        }),
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        expires: expiresInOneDay,
+  
+  if (isProtectedRoute) {
+    console.log('Middleware: Checking authentication for protected route:', request.nextUrl.pathname);
+    
+    // First check Supabase Auth
+    if (supabaseSession) {
+      // User is authenticated with Supabase
+      console.log('Middleware: User authenticated with Supabase', {
+        user: supabaseSession.user.email,
+        user_id: supabaseSession.user.id,
+        expires_at: supabaseSession.expires_at ? new Date(supabaseSession.expires_at * 1000).toISOString() : 'unknown'
       });
-    } catch (error) {
-      console.error('Error updating session:', error);
-      res.cookies.delete('session');
-      if (isProtectedRoute) {
-        return NextResponse.redirect(new URL('/sign-in', request.url));
-      }
+      
+      // Set the user ID in the request headers for use in the API routes
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set('x-user-id', supabaseSession.user.id);
+      
+      // Return the response with the updated headers
+      const response = NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      });
+      
+      // Copy all cookies from the original response
+      res.headers.getSetCookie().forEach(cookie => {
+        response.headers.append('Set-Cookie', cookie);
+      });
+      
+      return response;
     }
+    
+    // If no Supabase session, redirect to auth page
+    console.log('Middleware: No Supabase session found, redirecting to auth');
+    return NextResponse.redirect(new URL('/auth', request.url));
   }
-
+  
   return res;
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/dashboard/:path*',
+    '/api/:path*',
+    '/test-auth',
+  ],
 };

@@ -45,7 +45,7 @@ export default function HomePage() {
       <section className="py-16 bg-white w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <WizardCard />
+
             {/* Add more quick action cards here */}
           </div>
           <div className="lg:grid lg:grid-cols-3 lg:gap-8">

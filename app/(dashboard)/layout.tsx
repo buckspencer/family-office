@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleIcon, Home, LogOut, PlusCircle } from 'lucide-react';
 import {
@@ -12,13 +12,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useUser } from '@/lib/auth';
-import { signOut } from '@/app/(login)/actions';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth/auth-provider';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { userPromise } = useUser();
-  const user = use(userPromise);
+  const { user, isLoading } = useUser();
+  const { signOut } = useAuth();
   const router = useRouter();
 
   async function handleSignOut() {
@@ -35,17 +35,19 @@ function Header() {
           <span className="ml-2 text-xl font-semibold text-gray-900">Family</span>
         </Link>
         <div className="flex items-center space-x-4">
-          {user ? (
+          {isLoading ? (
+            <div className="h-9 w-9 rounded-full bg-gray-200 animate-pulse"></div>
+          ) : user ? (
             <>
               <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                 <DropdownMenuTrigger>
                   <Avatar className="cursor-pointer size-9">
                     <AvatarImage alt={user.name || ''} />
                     <AvatarFallback>
-                      {user.email
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
+                      {user.email && user.email
+                        .split('@')[0]
+                        .substring(0, 2)
+                        .toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 </DropdownMenuTrigger>
@@ -56,14 +58,13 @@ function Header() {
                       <span>Dashboard</span>
                     </Link>
                   </DropdownMenuItem>
-                  <form action={handleSignOut} className="w-full">
-                    <button type="submit" className="flex w-full">
-                      <DropdownMenuItem className="w-full flex-1 cursor-pointer">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Sign out</span>
-                      </DropdownMenuItem>
-                    </button>
-                  </form>
+                  <DropdownMenuItem 
+                    className="w-full flex-1 cursor-pointer"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
@@ -73,14 +74,7 @@ function Header() {
                 asChild
                 className="bg-black hover:bg-gray-800 text-white text-sm px-4 py-2 rounded-md"
               >
-                <Link href="/sign-in">Sign In</Link>
-              </Button>
-              <Button
-                variant="outline"
-                asChild
-                className="text-sm px-4 py-2 rounded-md"
-              >
-                <Link href="/sign-up">Sign Up</Link>
+                <Link href="/auth">Sign In</Link>
               </Button>
             </div>
           )}

@@ -1,12 +1,29 @@
+'use server';
+
 import { revalidatePath } from 'next/cache';
-// @ts-ignore - Using temp-schema
-import { db } from '@/lib/db/drizzle';
-// @ts-ignore - Using temp-schema
-import { eq, desc, SQL } from 'drizzle-orm';
-// @ts-ignore - Using temp-schema
-import { Document, DocumentCreate, DocumentUpdate } from '@/lib/db/temp-schema/documents.types';
-// TODO: Import document schema once created
-// import { documents } from '../schema';
+import { db } from '@/lib/db';
+import { eq, desc, and, sql } from 'drizzle-orm';
+import { documents, type Document } from '../schema';
+import { z } from 'zod';
+import { supabase, deleteFile, getS3SignedUrl } from '@/lib/supabase';
+
+// Define NewDocument type based on Document
+type NewDocument = {
+  name: string;
+  category: string;
+  expiryDate?: Date | null;
+  notes?: string | null;
+  fileUrl: string;
+  fileSize?: number | null;
+  fileType?: string | null;
+  isEncrypted?: boolean;
+  lastAccessed?: Date | null;
+  isArchived?: boolean;
+  tags?: string[] | null;
+  metadata?: Record<string, any> | null;
+  teamId: number;
+  userId: number;
+};
 
 type ActionResponse<T> = {
   success: boolean;
@@ -15,71 +32,117 @@ type ActionResponse<T> = {
 };
 
 // Database Operations
-async function createDocumentQuery(data: DocumentCreate) {
-  // TODO: Implement after schema
-  // return db.insert(documents).values(data).returning();
-  return null;
+async function createDocumentQuery(data: NewDocument) {
+  return db.insert(documents).values(data).returning();
 }
 
-async function getDocumentsQuery(teamId: number) {
-  // TODO: Implement after schema
-  // return db.query.documents.findMany({
-  //   where: eq(documents.teamId, teamId),
-  //   orderBy: desc(documents.createdAt),
-  //   with: {
-  //     user: true,
-  //   },
-  // });
-  return [];
+async function getDocumentsQuery(teamId: number, options?: { 
+  limit?: number; 
+  offset?: number; 
+  orderBy?: string; 
+  orderDir?: 'asc' | 'desc';
+  isArchived?: boolean;
+}) {
+  const { limit = 100, offset = 0, orderBy = 'createdAt', orderDir = 'desc', isArchived = false } = options || {};
+  
+  const orderColumn = documents[orderBy as keyof typeof documents] as any;
+  const orderDirection = orderDir === 'asc' ? sql`asc` : sql`desc`;
+  
+  return db.select()
+    .from(documents)
+    .where(
+      and(
+        eq(documents.teamId, teamId),
+        eq(documents.isArchived, isArchived)
+      )
+    )
+    .orderBy(sql`${orderColumn} ${orderDirection}`)
+    .limit(limit)
+    .offset(offset);
 }
 
 async function getDocumentByIdQuery(id: number) {
-  // TODO: Implement after schema
-  // return db.query.documents.findFirst({
-  //   where: eq(documents.id, id),
-  //   with: {
-  //     user: true,
-  //   },
-  // });
-  return null;
+  return db.select()
+    .from(documents)
+    .where(eq(documents.id, id))
+    .limit(1);
 }
 
-async function updateDocumentQuery(id: number, data: DocumentUpdate) {
-  // TODO: Implement after schema
-  // return db.update(documents)
-  //   .set({ ...data, updatedAt: new Date() })
-  //   .where(eq(documents.id, id))
-  //   .returning();
-  return null;
+async function updateDocumentQuery(id: number, data: Partial<Document>) {
+  return db.update(documents)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(documents.id, id))
+    .returning();
 }
 
 async function deleteDocumentQuery(id: number) {
-  // TODO: Implement after schema
-  // return db.delete(documents)
-  //   .where(eq(documents.id, id))
-  //   .returning();
-  return null;
+  return db.delete(documents)
+    .where(eq(documents.id, id))
+    .returning();
 }
 
+// Input validation schemas
+const createDocumentSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  category: z.string().min(1, "Category is required"),
+  expiryDate: z.date().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  fileUrl: z.string().min(1, "File URL is required"),
+  fileSize: z.number().nullable().optional(),
+  fileType: z.string().nullable().optional(),
+  isEncrypted: z.boolean().optional().default(false),
+  lastAccessed: z.date().nullable().optional(),
+  isArchived: z.boolean().optional().default(false),
+  tags: z.array(z.string()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+  teamId: z.number(),
+  userId: z.number()
+});
+
+const updateDocumentSchema = createDocumentSchema.partial();
+
 // Server Actions
-export async function createDocument(data: DocumentCreate): Promise<ActionResponse<Document | null>> {
-  'use server';
-  
+export async function createDocument(data: NewDocument): Promise<ActionResponse<Document>> {
   try {
-    const document = await createDocumentQuery(data);
-    revalidatePath('/family/documents');
+    // Validate input
+    const validatedData = createDocumentSchema.parse(data);
+    
+    // Ensure null values for optional fields that might be undefined
+    const documentData = {
+      ...validatedData,
+      expiryDate: validatedData.expiryDate ?? null,
+      notes: validatedData.notes ?? null,
+      fileSize: validatedData.fileSize ?? null,
+      fileType: validatedData.fileType ?? null,
+      lastAccessed: validatedData.lastAccessed ?? null,
+      tags: validatedData.tags ?? null,
+      metadata: validatedData.metadata ?? null,
+    };
+    
+    const [document] = await createDocumentQuery(documentData);
+    revalidatePath('/dashboard/resources/documents');
     return { success: true, data: document };
   } catch (error) {
     console.error('Error creating document:', error);
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
     return { success: false, error: 'Failed to create document' };
   }
 }
 
-export async function getDocuments(teamId: number): Promise<ActionResponse<Document[]>> {
-  'use server';
-  
+export async function getDocuments(
+  teamId: number, 
+  options?: { 
+    limit?: number; 
+    offset?: number; 
+    orderBy?: string; 
+    orderDir?: 'asc' | 'desc';
+    isArchived?: boolean;
+  }
+): Promise<ActionResponse<Document[]>> {
   try {
-    const documents = await getDocumentsQuery(teamId);
+    const documents = await getDocumentsQuery(teamId, options);
     return { success: true, data: documents };
   } catch (error) {
     console.error('Error fetching documents:', error);
@@ -87,12 +150,9 @@ export async function getDocuments(teamId: number): Promise<ActionResponse<Docum
   }
 }
 
-// @ts-ignore - Using temp-schema
 export async function getDocumentById(id: number): Promise<ActionResponse<Document | null>> {
-  'use server';
-  
   try {
-    const document = await getDocumentByIdQuery(id);
+    const [document] = await getDocumentByIdQuery(id);
     if (!document) {
       return { success: false, error: 'Document not found' };
     }
@@ -103,45 +163,192 @@ export async function getDocumentById(id: number): Promise<ActionResponse<Docume
   }
 }
 
-// @ts-ignore - Using temp-schema
-export async function updateDocument(id: number, data: Partial<Document>): Promise<ActionResponse<Document | null>> {
-  'use server';
-  
+export async function updateDocument(id: number, data: Partial<Document>): Promise<ActionResponse<Document>> {
   try {
-    const document = await updateDocumentQuery(id, data);
-    revalidatePath('/family/documents');
+    // Validate input
+    const validatedData = updateDocumentSchema.parse(data);
+    
+    const [document] = await updateDocumentQuery(id, validatedData);
+    if (!document) {
+      return { success: false, error: 'Document not found' };
+    }
+    revalidatePath('/dashboard/resources/documents');
     return { success: true, data: document };
   } catch (error) {
     console.error('Error updating document:', error);
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
     return { success: false, error: 'Failed to update document' };
   }
 }
 
-// @ts-ignore - Using temp-schema
-export async function deleteDocument(id: number): Promise<ActionResponse<Document | null>> {
-  'use server';
-  
+export async function deleteDocument(id: number): Promise<ActionResponse<Document>> {
   try {
-    const document = await deleteDocumentQuery(id);
-    revalidatePath('/family/documents');
-    return { success: true, data: document };
+    // First, get the document to retrieve the file URL
+    const [document] = await getDocumentByIdQuery(id);
+    
+    if (!document) {
+      return { success: false, error: 'Document not found' };
+    }
+    
+    // Try to delete the file from storage if it exists
+    if (document.fileUrl && !document.fileUrl.includes('404') && !document.fileUrl.includes('Bucket not found')) {
+      try {
+        // Use the deleteFile helper function
+        const { success, error } = await deleteFile(document.fileUrl);
+        
+        if (!success) {
+          // Log the error but continue with document deletion
+          console.error('Error deleting file from storage:', error);
+        }
+      } catch (storageError) {
+        // Log the error but continue with document deletion
+        console.error('Error processing file deletion:', storageError);
+      }
+    }
+    
+    // Delete the document from the database
+    const [deletedDocument] = await deleteDocumentQuery(id);
+    
+    if (!deletedDocument) {
+      return { success: false, error: 'Failed to delete document record' };
+    }
+    
+    revalidatePath('/dashboard/resources/documents');
+    return { success: true, data: deletedDocument };
   } catch (error) {
     console.error('Error deleting document:', error);
     return { success: false, error: 'Failed to delete document' };
   }
 }
 
-// @ts-ignore - Using temp-schema
-export async function getDocumentsByTeam(teamId: number): Promise<Document[]> {
-  // ... existing code ...
+// Archive/Unarchive document
+export async function toggleDocumentArchiveStatus(id: number, isArchived: boolean): Promise<ActionResponse<Document>> {
+  try {
+    const [document] = await updateDocumentQuery(id, { isArchived });
+    if (!document) {
+      return { success: false, error: 'Document not found' };
+    }
+    revalidatePath('/dashboard/resources/documents');
+    return { success: true, data: document };
+  } catch (error) {
+    console.error('Error updating document archive status:', error);
+    return { success: false, error: 'Failed to update document archive status' };
+  }
 }
 
-// @ts-ignore - Using temp-schema
-export async function updateDocument(id: number, data: Partial<Document>): Promise<Document | null> {
-  // ... existing code ...
+// Batch operations
+export async function batchDeleteDocuments(ids: number[]): Promise<ActionResponse<{ count: number }>> {
+  try {
+    const result = await db.delete(documents)
+      .where(sql`${documents.id} IN (${ids.join(',')})`)
+      .returning();
+    
+    revalidatePath('/dashboard/resources/documents');
+    return { success: true, data: { count: result.length } };
+  } catch (error) {
+    console.error('Error batch deleting documents:', error);
+    return { success: false, error: 'Failed to delete documents' };
+  }
 }
 
-// @ts-ignore - Using temp-schema
-export async function deleteDocument(id: number): Promise<boolean> {
-  // ... existing code ...
-} 
+export async function batchArchiveDocuments(ids: number[], isArchived: boolean): Promise<ActionResponse<{ count: number }>> {
+  try {
+    const result = await db.update(documents)
+      .set({ isArchived, updatedAt: new Date() })
+      .where(sql`${documents.id} IN (${ids.join(',')})`)
+      .returning();
+    
+    revalidatePath('/dashboard/resources/documents');
+    return { success: true, data: { count: result.length } };
+  } catch (error) {
+    console.error('Error batch archiving documents:', error);
+    return { success: false, error: 'Failed to archive documents' };
+  }
+}
+
+// Generate a signed URL for a document file
+export async function getSignedDocumentUrl(fileUrl: string, expiresIn: number = 3600): Promise<ActionResponse<string>> {
+  try {
+    console.log('Original fileUrl:', fileUrl);
+    
+    // Check if the URL is a placeholder or error URL
+    if (fileUrl.includes('404') || fileUrl.includes('Bucket not found')) {
+      return { 
+        success: false, 
+        error: 'The file storage bucket does not exist or the file is missing.' 
+      };
+    }
+
+    // Extract the path from the URL
+    if (!fileUrl.includes('/storage/v1/object/public/')) {
+      console.log('URL does not match expected format, using original URL:', fileUrl);
+      return { success: true, data: fileUrl };
+    }
+    
+    const urlParts = fileUrl.split('/storage/v1/object/public/');
+    if (urlParts.length < 2) {
+      console.log('URL split resulted in unexpected format, using original URL:', fileUrl);
+      return { success: true, data: fileUrl };
+    }
+    
+    const pathParts = urlParts[1].split('/');
+    if (pathParts.length < 2) {
+      console.log('Path parts insufficient, using original URL:', fileUrl);
+      return { success: true, data: fileUrl };
+    }
+    
+    const bucket = pathParts[0];
+    const filePath = pathParts.slice(1).join('/');
+    
+    console.log('Attempting to generate S3 signed URL for:', { bucket, filePath });
+    
+    // Try the new S3 client approach
+    const { url, error } = await getS3SignedUrl(bucket, filePath, expiresIn);
+    
+    if (error || !url) {
+      console.error('Error generating S3 signed URL, falling back to public URL:', error);
+      
+      // Fall back to public URL
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      
+      if (publicUrlData && publicUrlData.publicUrl) {
+        console.log('Using public URL as fallback');
+        return { success: true, data: publicUrlData.publicUrl };
+      }
+      
+      return { 
+        success: false, 
+        error: 'Failed to generate URL for the document. The file may not exist or you may not have permission to access it.' 
+      };
+    }
+    
+    console.log('Successfully generated S3 signed URL');
+    return { success: true, data: url };
+  } catch (error) {
+    console.error('Error in getSignedDocumentUrl:', error);
+    
+    // Always try to return something useful rather than an error
+    try {
+      const urlParts = fileUrl.split('/storage/v1/object/public/');
+      if (urlParts.length >= 2) {
+        const pathParts = urlParts[1].split('/');
+        const bucket = pathParts[0];
+        const filePath = pathParts.slice(1).join('/');
+        
+        // Fall back to public URL
+        const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+        
+        if (publicUrlData && publicUrlData.publicUrl) {
+          console.log('Using public URL after error');
+          return { success: true, data: publicUrlData.publicUrl };
+        }
+      }
+    } catch (fallbackError) {
+      console.error('Error in fallback:', fallbackError);
+    }
+    
+    return { success: false, error: 'Failed to generate URL' };
+  }
+}

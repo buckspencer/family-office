@@ -2,11 +2,11 @@
 
 # Family Office
 
-This is a starter template for building a SaaS application using **Next.js** with support for authentication, Stripe integration for payments, and a dashboard for logged-in users.
+A comprehensive family office management system built with Next.js, focusing on document management, contact organization, event tracking, and subscription management.
 
 **Demo: [https://next-saas-start.vercel.app/](https://next-saas-start.vercel.app/)**
 
-## Family Office Application Status
+## Project Status & Roadmap
 
 ### Current Features
 - ✅ User authentication and team management
@@ -16,47 +16,65 @@ This is a starter template for building a SaaS application using **Next.js** wit
 - ✅ State management with Zustand
 - ✅ Basic navigation and routing
 
-### MVP Requirements
+### MVP Roadmap
 
-#### Database Integration
-- [ ] Create database tables for:
-  - [ ] Documents (title, description, file_url, created_at, updated_at)
-  - [ ] Contacts (name, email, phone, created_at, updated_at)
-  - [ ] Events (title, date, description, created_at, updated_at)
-  - [ ] Subscriptions (service_name, cost, renewal_date, created_at, updated_at)
-- [ ] Set up database migrations
-- [ ] Implement database queries and mutations
-- [ ] Add proper error handling for database operations
+#### Phase 1: Core Infrastructure (Current)
+- Database & Authentication
+  - ✅ Database schema setup
+  - ✅ User authentication
+  - ✅ Team management
+  - ✅ Basic role-based access control
 
-#### Data Entry Wizard
-- [ ] Implement data validation for all form fields
-- [ ] Add file upload functionality for documents
-- [ ] Connect form submissions to database
-- [ ] Add success/error notifications
-- [ ] Implement proper error handling
-- [ ] Add loading states during submissions
+- Resource Management APIs
+  - ✅ Subscription management
+  - ⬜ Document management
+    - Basic CRUD operations
+    - File upload/storage integration
+    - Basic file type validation
+  - ⬜ Contact management
+  - ⬜ Event management
 
-#### Dashboard Features
-- [ ] Display lists of entered data (documents, contacts, events, subscriptions)
-- [ ] Add search and filtering capabilities
-- [ ] Implement sorting options
-- [ ] Add pagination for large datasets
-- [ ] Create detailed view pages for each data type
+#### Phase 2: Essential UI/UX
+- Dashboard & Navigation
+  - ⬜ Resource overview dashboard
+  - ⬜ Resource-specific list views
+  - ⬜ Mobile responsiveness
 
-#### Additional Features
-- [ ] Add data export functionality
-- [ ] Implement data import capabilities
-- [ ] Add user activity logging
-- [ ] Create notification system for upcoming events/renewals
-- [ ] Add data visualization for subscriptions and costs
+- Data Entry Workflows
+  - ⬜ Document upload wizard
+  - ⬜ Contact entry form
+  - ⬜ Event creation
+  - ⬜ Subscription management
 
-### Future Enhancements
-- Voice input for data entry
-- API integrations for automatic data import
-- Advanced analytics and reporting
-- Mobile app version
+#### Phase 3: MVP Features
+- Team Collaboration
+  - ⬜ Basic sharing controls
+  - ⬜ Team member invitations
+  - ⬜ Activity logging
+  - ⬜ Simple notification system
+
+- Data Organization
+  - ⬜ Basic tagging system
+  - ⬜ Categories/folders
+  - ⬜ Simple search
+  - ⬜ Basic export functionality
+
+#### Phase 4: MVP Polish & Launch
+- ⬜ Testing & Optimization
+- ⬜ Documentation
+- ⬜ Production environment setup
+- ⬜ Monitoring & logging
+
+### Future Enhancements (Post-MVP)
+- End-to-end encryption
+- Advanced search capabilities
+- Document OCR and data extraction
+- Advanced reporting
+- Custom workflows
+- Mobile app
+- API integrations
+- Advanced analytics
 - Multi-language support
-- Advanced search with full-text capabilities
 
 ## Features
 
@@ -163,3 +181,24 @@ While this template is intentionally minimal and to be used as a learning resour
 - https://achromatic.dev
 - https://shipfa.st
 - https://makerkit.dev
+
+## Project Management
+
+This project is managed using Trello. To view or contribute to the project board:
+
+1. Request access to the Trello board
+2. Track progress through the MVP phases
+3. Participate in task assignments and updates
+
+[Request Trello Access →]
+
+## Contributing
+
+1. Create a feature branch
+2. Make your changes
+3. Run tests and linting
+4. Submit a pull request
+
+## License
+
+[Add License Information]

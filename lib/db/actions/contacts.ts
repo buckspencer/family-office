@@ -1,118 +1,227 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { db } from '@/lib/db';
+import { eq, desc, and, sql } from 'drizzle-orm';
+import { contacts, contactType } from '../schema';
 import { z } from 'zod';
-import { Contact, ContactCreate, ContactUpdate } from '@/lib/db/temp-schema/contacts.types';
-import { getUserWithTeam } from '@/lib/db/actions/users';
-import { validatedActionWithUser } from '@/lib/auth/middleware';
 
-// This will be replaced with actual database operations
-const contacts: Contact[] = [];
+// Define types based on the schema
+type Contact = typeof contacts.$inferSelect;
+type NewContact = typeof contacts.$inferInsert;
 
-// Validation schemas
-export const contactSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  type: z.enum(['family', 'medical', 'financial', 'legal', 'service', 'other'], {
-    required_error: 'Contact type is required',
-  }),
-  relationship: z.string().min(1, 'Relationship is required'),
-  email: z.string().email().optional().or(z.literal('')),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  notes: z.string().optional(),
+type ActionResponse<T> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+};
+
+// Database Operations
+async function createContactQuery(data: NewContact) {
+  return db.insert(contacts).values(data).returning();
+}
+
+async function getContactsQuery(teamId: number, options?: { 
+  limit?: number; 
+  offset?: number; 
+  orderBy?: string; 
+  orderDir?: 'asc' | 'desc';
+  isArchived?: boolean;
+  type?: typeof contactType.enumValues[number];
+}) {
+  const { 
+    limit = 100, 
+    offset = 0, 
+    orderBy = 'createdAt', 
+    orderDir = 'desc', 
+    isArchived = false,
+    type
+  } = options || {};
+  
+  const orderColumn = contacts[orderBy as keyof typeof contacts] as any;
+  const orderDirection = orderDir === 'asc' ? sql`asc` : sql`desc`;
+  
+  let conditions = and(
+    eq(contacts.teamId, teamId),
+    eq(contacts.isArchived, isArchived)
+  );
+  
+  if (type) {
+    conditions = and(conditions, eq(contacts.type, type));
+  }
+  
+  return db.select()
+    .from(contacts)
+    .where(conditions)
+    .orderBy(sql`${orderColumn} ${orderDirection}`)
+    .limit(limit)
+    .offset(offset);
+}
+
+async function getContactByIdQuery(id: number) {
+  return db.select()
+    .from(contacts)
+    .where(eq(contacts.id, id))
+    .limit(1);
+}
+
+async function updateContactQuery(id: number, data: Partial<Contact>) {
+  return db.update(contacts)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(contacts.id, id))
+    .returning();
+}
+
+async function deleteContactQuery(id: number) {
+  return db.delete(contacts)
+    .where(eq(contacts.id, id))
+    .returning();
+}
+
+// Input validation schemas
+const createContactSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  type: z.enum(contactType.enumValues),
+  relationship: z.string().min(1, "Relationship is required"),
+  email: z.string().email().nullish(),
+  phone: z.string().nullish(),
+  address: z.string().nullish(),
+  notes: z.string().nullish(),
+  isArchived: z.boolean().optional(),
+  tags: z.array(z.string()).nullish(),
+  metadata: z.record(z.any()).nullish(),
+  teamId: z.number(),
+  userId: z.number()
 });
 
-export const contactUpdateSchema = contactSchema.extend({
-  id: z.number(),
-});
+const updateContactSchema = createContactSchema.partial();
 
-// Database operations with auth checks
-export async function getContactsByTeam(teamId: number): Promise<Contact[]> {
-  return contacts.filter(contact => contact.teamId === teamId);
-}
-
-export async function getContactById(id: number): Promise<Contact | null> {
-  return contacts.find(contact => contact.id === id) || null;
-}
-
-export async function getContactsByUser(userId: number): Promise<Contact[]> {
-  return contacts.filter(contact => contact.userId === userId);
-}
-
-export async function getContactsByTeamAndType(teamId: number, type: Contact['type']): Promise<Contact[]> {
-  return contacts.filter(contact => contact.teamId === teamId && contact.type === type);
-}
-
-// Server actions with validation and auth
-export const createContact = validatedActionWithUser(
-  contactSchema,
-  async (data, _, user) => {
-    const userWithTeam = await getUserWithTeam(user.id);
-    if (!userWithTeam?.teamId) {
-      throw new Error('User is not associated with a team.');
-    }
-
-    try {
-      const newContact: Contact = {
-        id: contacts.length + 1,
-        ...data,
-        teamId: userWithTeam.teamId,
-        userId: user.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      contacts.push(newContact);
-      return { data: newContact, message: 'Contact created successfully.' };
-    } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to create contact.');
-    }
-  }
-);
-
-export const updateContact = validatedActionWithUser(
-  contactUpdateSchema,
-  async (data, _, user) => {
-    const userWithTeam = await getUserWithTeam(user.id);
-    if (!userWithTeam?.teamId) {
-      throw new Error('User is not associated with a team.');
-    }
-
-    const { id, ...updateData } = data;
-    const index = contacts.findIndex(contact => contact.id === id && contact.teamId === userWithTeam.teamId);
+// Server Actions
+export async function createContact(data: z.infer<typeof createContactSchema>): Promise<ActionResponse<Contact>> {
+  try {
+    // Validate input
+    const validatedData = createContactSchema.parse(data);
     
-    if (index === -1) {
-      throw new Error('Contact not found or access denied.');
+    const [contact] = await createContactQuery(validatedData);
+    revalidatePath('/family/contacts');
+    return { success: true, data: contact };
+  } catch (error) {
+    console.error('Error creating contact:', error);
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
     }
-
-    try {
-      contacts[index] = {
-        ...contacts[index],
-        ...updateData,
-        updatedAt: new Date(),
-      };
-      return { data: contacts[index], message: 'Contact updated successfully.' };
-    } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to update contact.');
-    }
+    return { success: false, error: 'Failed to create contact' };
   }
-);
+}
 
-export const deleteContact = validatedActionWithUser(
-  z.object({ id: z.number() }),
-  async (data, _, user) => {
-    const userWithTeam = await getUserWithTeam(user.id);
-    if (!userWithTeam?.teamId) {
-      throw new Error('User is not associated with a team.');
+export async function getContacts(
+  teamId: number, 
+  options?: { 
+    limit?: number; 
+    offset?: number; 
+    orderBy?: string; 
+    orderDir?: 'asc' | 'desc';
+    isArchived?: boolean;
+    type?: typeof contactType.enumValues[number];
+  }
+): Promise<ActionResponse<Contact[]>> {
+  try {
+    const contactsList = await getContactsQuery(teamId, options);
+    return { success: true, data: contactsList };
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+    return { success: false, error: 'Failed to fetch contacts' };
+  }
+}
+
+export async function getContactById(id: number): Promise<ActionResponse<Contact | null>> {
+  try {
+    const [contact] = await getContactByIdQuery(id);
+    if (!contact) {
+      return { success: false, error: 'Contact not found' };
     }
+    return { success: true, data: contact };
+  } catch (error) {
+    console.error('Error fetching contact:', error);
+    return { success: false, error: 'Failed to fetch contact' };
+  }
+}
 
-    const index = contacts.findIndex(contact => contact.id === data.id && contact.teamId === userWithTeam.teamId);
+export async function updateContact(id: number, data: z.infer<typeof updateContactSchema>): Promise<ActionResponse<Contact>> {
+  try {
+    // Validate input
+    const validatedData = updateContactSchema.parse(data);
     
-    if (index === -1) {
-      throw new Error('Contact not found or access denied.');
+    const [contact] = await updateContactQuery(id, validatedData);
+    if (!contact) {
+      return { success: false, error: 'Contact not found' };
     }
-
-    try {
-      contacts.splice(index, 1);
-      return { message: 'Contact deleted successfully.' };
-    } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to delete contact.');
+    revalidatePath('/family/contacts');
+    return { success: true, data: contact };
+  } catch (error) {
+    console.error('Error updating contact:', error);
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
     }
+    return { success: false, error: 'Failed to update contact' };
   }
-); 
+}
+
+export async function deleteContact(id: number): Promise<ActionResponse<Contact>> {
+  try {
+    const [contact] = await deleteContactQuery(id);
+    if (!contact) {
+      return { success: false, error: 'Contact not found' };
+    }
+    revalidatePath('/family/contacts');
+    return { success: true, data: contact };
+  } catch (error) {
+    console.error('Error deleting contact:', error);
+    return { success: false, error: 'Failed to delete contact' };
+  }
+}
+
+// Archive/Unarchive contact
+export async function toggleContactArchiveStatus(id: number, isArchived: boolean): Promise<ActionResponse<Contact>> {
+  try {
+    const [contact] = await updateContactQuery(id, { isArchived });
+    if (!contact) {
+      return { success: false, error: 'Contact not found' };
+    }
+    revalidatePath('/family/contacts');
+    return { success: true, data: contact };
+  } catch (error) {
+    console.error('Error updating contact archive status:', error);
+    return { success: false, error: 'Failed to update contact archive status' };
+  }
+}
+
+// Batch operations
+export async function batchDeleteContacts(ids: number[]): Promise<ActionResponse<{ count: number }>> {
+  try {
+    const result = await db.delete(contacts)
+      .where(sql`${contacts.id} IN (${ids.join(',')})`)
+      .returning();
+    
+    revalidatePath('/family/contacts');
+    return { success: true, data: { count: result.length } };
+  } catch (error) {
+    console.error('Error batch deleting contacts:', error);
+    return { success: false, error: 'Failed to delete contacts' };
+  }
+}
+
+export async function batchArchiveContacts(ids: number[], isArchived: boolean): Promise<ActionResponse<{ count: number }>> {
+  try {
+    const result = await db.update(contacts)
+      .set({ isArchived, updatedAt: new Date() })
+      .where(sql`${contacts.id} IN (${ids.join(',')})`)
+      .returning();
+    
+    revalidatePath('/family/contacts');
+    return { success: true, data: { count: result.length } };
+  } catch (error) {
+    console.error('Error batch archiving contacts:', error);
+    return { success: false, error: 'Failed to archive contacts' };
+  }
+} 

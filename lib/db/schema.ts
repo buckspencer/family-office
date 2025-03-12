@@ -5,8 +5,15 @@ import {
   text,
   timestamp,
   integer,
+  boolean,
+  jsonb,
+  decimal,
+  pgEnum,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { z } from 'zod';
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -143,3 +150,124 @@ export enum ActivityType {
   UPDATE_DOCUMENT = 'UPDATE_DOCUMENT',
   DELETE_DOCUMENT = 'DELETE_DOCUMENT',
 }
+
+// Resource-related enums
+export const contactType = pgEnum('contact_type', ['family', 'medical', 'financial', 'legal', 'service', 'other']);
+export const eventType = pgEnum('event_type', ['birthday', 'anniversary', 'holiday', 'reminder', 'other']);
+export const subscriptionType = pgEnum('subscription_type', ['service', 'membership', 'subscription', 'other']);
+export const billingFrequency = pgEnum('billing_frequency', ['monthly', 'quarterly', 'yearly', 'one-time']);
+export const subscriptionStatus = pgEnum('subscription_status', ['active', 'cancelled', 'pending', 'failed']);
+
+// Documents table
+export const documents = pgTable('documents', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  category: varchar('category', { length: 100 }).notNull(),
+  expiryDate: timestamp('expiry_date'),
+  notes: text('notes'),
+  fileUrl: text('file_url').notNull(),
+  fileSize: integer('file_size'),
+  fileType: varchar('file_type', { length: 100 }),
+  isEncrypted: boolean('is_encrypted').default(false),
+  lastAccessed: timestamp('last_accessed'),
+  isArchived: boolean('is_archived').default(false),
+  tags: text('tags').array(),
+  metadata: jsonb('metadata'),
+  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+// Contacts table
+export const contacts = pgTable('contacts', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: contactType('type').notNull(),
+  relationship: varchar('relationship', { length: 100 }).notNull(),
+  email: varchar('email', { length: 255 }),
+  phone: varchar('phone', { length: 50 }),
+  address: text('address'),
+  notes: text('notes'),
+  isArchived: boolean('is_archived').default(false),
+  tags: text('tags').array(),
+  metadata: jsonb('metadata'),
+  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+// Events table
+export const events = pgTable('events', {
+  id: serial('id').primaryKey(),
+  title: varchar('title', { length: 255 }).notNull(),
+  type: eventType('type').notNull(),
+  description: text('description'),
+  startDate: timestamp('start_date').notNull(),
+  endDate: timestamp('end_date'),
+  location: text('location'),
+  notes: text('notes'),
+  isRecurring: boolean('is_recurring').default(false),
+  recurrenceRule: text('recurrence_rule'),
+  reminderBefore: integer('reminder_before'),
+  isArchived: boolean('is_archived').default(false),
+  tags: text('tags').array(),
+  metadata: jsonb('metadata'),
+  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+// Subscriptions table
+export const subscriptions = pgTable('subscriptions', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: subscriptionType('type').notNull(),
+  description: text('description').notNull(),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  billingFrequency: billingFrequency('billing_frequency').notNull(),
+  startDate: timestamp('start_date').notNull(),
+  endDate: timestamp('end_date'),
+  autoRenew: boolean('auto_renew').default(true),
+  category: varchar('category', { length: 100 }),
+  notes: text('notes'),
+  paymentMethod: varchar('payment_method', { length: 100 }),
+  lastBilled: timestamp('last_billed'),
+  nextBilling: timestamp('next_billing'),
+  status: subscriptionStatus('status').default('active').notNull(),
+  isArchived: boolean('is_archived').default(false),
+  tags: text('tags').array(),
+  metadata: jsonb('metadata'),
+  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+// Zod schemas for validation
+export const insertDocumentSchema = createInsertSchema(documents);
+export const selectDocumentSchema = createSelectSchema(documents);
+
+export const insertContactSchema = createInsertSchema(contacts);
+export const selectContactSchema = createSelectSchema(contacts);
+
+export const insertEventSchema = createInsertSchema(events);
+export const selectEventSchema = createSelectSchema(events);
+
+export const insertSubscriptionSchema = createInsertSchema(subscriptions);
+export const selectSubscriptionSchema = createSelectSchema(subscriptions);
+
+// Types
+export type Document = typeof documents.$inferSelect;
+export type DocumentInsert = typeof documents.$inferInsert;
+
+export type Contact = typeof contacts.$inferSelect;
+export type ContactInsert = typeof contacts.$inferInsert;
+
+export type Event = typeof events.$inferSelect;
+export type EventInsert = typeof events.$inferInsert;
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type SubscriptionInsert = typeof subscriptions.$inferInsert;

@@ -1,31 +1,56 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
-import { User } from '@/lib/db/schema';
+import { createContext, useContext, ReactNode, useEffect, useState } from 'react';
+import { useAuth } from './auth-provider';
 
-type UserContextType = {
-  userPromise: Promise<User | null>;
+// Define a compatible user type that works with Supabase
+type CompatibleUser = {
+  id: string;
+  email: string | null;
+  name: string | null;
 };
 
-const UserContext = createContext<UserContextType | null>(null);
+type UserContextType = {
+  user: CompatibleUser | null;
+  isLoading: boolean;
+};
+
+const UserContext = createContext<UserContextType>({
+  user: null,
+  isLoading: true,
+});
 
 export function useUser(): UserContextType {
-  const context = useContext(UserContext);
-  if (context === null) {
-    throw new Error('useUser must be used within a UserProvider');
-  }
-  return context;
+  return useContext(UserContext);
 }
 
 export function UserProvider({
-  children,
-  userPromise
+  children
 }: {
   children: ReactNode;
-  userPromise: Promise<User | null>;
 }) {
+  const { user: supabaseUser, isLoading: authLoading } = useAuth();
+  const [user, setUser] = useState<CompatibleUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    if (!authLoading) {
+      if (supabaseUser) {
+        const mappedUser: CompatibleUser = {
+          id: supabaseUser.id,
+          email: supabaseUser.email || null,
+          name: supabaseUser.user_metadata?.name || (supabaseUser.email ? supabaseUser.email.split('@')[0] : null),
+        };
+        setUser(mappedUser);
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    }
+  }, [supabaseUser, authLoading]);
+
   return (
-    <UserContext.Provider value={{ userPromise }}>
+    <UserContext.Provider value={{ user, isLoading }}>
       {children}
     </UserContext.Provider>
   );

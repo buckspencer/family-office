@@ -12,7 +12,7 @@ import {
 import { Loader2, PlusCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { use, useActionState } from 'react';
+import { useActionState } from 'react';
 import { inviteTeamMember } from '@/app/(login)/actions';
 import { useUser } from '@/lib/auth';
 
@@ -22,13 +22,26 @@ type ActionState = {
 };
 
 export function InviteFamilyMember() {
-  const { userPromise } = useUser();
-  const user = use(userPromise);
-  const isOwner = user?.role === 'owner';
+  const { user, isLoading } = useUser();
+  // Default to false since we can't determine role from Supabase user
+  const isOwner = false;
   const [inviteState, inviteAction, isInvitePending] = useActionState<
     ActionState,
     FormData
   >(inviteTeamMember, { error: '', success: '' });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Invite Family Member</CardTitle>
+        </CardHeader>
+        <CardContent className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
