@@ -53,12 +53,13 @@ export async function getSession() {
         id: supabaseSession.user.id,
         email: supabaseSession.user.email || '',
         name: supabaseSession.user.user_metadata?.name || supabaseSession.user.email?.split('@')[0] || '',
+        teamId: supabaseSession.user.user_metadata?.teamId || 1,
       }
     };
   }
   
   // Fall back to the custom session
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get('session')?.value;
   
   if (!token) {
@@ -80,7 +81,7 @@ export async function setSession(user: NewUser) {
     user: {
       id: user.id!,
       email: user.email || '',
-      name: user.user_metadata?.name || user.email?.split('@')[0] || '',
+      name: user.name || user.email?.split('@')[0] || '',
     },
     expires: expiresInOneDay.toISOString(),
   };

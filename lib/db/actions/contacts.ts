@@ -103,7 +103,7 @@ export async function createContact(data: z.infer<typeof createContactSchema>): 
     const validatedData = createContactSchema.parse(data);
     
     const [contact] = await createContactQuery(validatedData);
-    revalidatePath('/family/contacts');
+    revalidatePath('/dashboard/resources/contacts');
     return { success: true, data: contact };
   } catch (error) {
     console.error('Error creating contact:', error);
@@ -156,7 +156,7 @@ export async function updateContact(id: number, data: z.infer<typeof updateConta
     if (!contact) {
       return { success: false, error: 'Contact not found' };
     }
-    revalidatePath('/family/contacts');
+    revalidatePath('/dashboard/resources/contacts');
     return { success: true, data: contact };
   } catch (error) {
     console.error('Error updating contact:', error);
@@ -173,7 +173,7 @@ export async function deleteContact(id: number): Promise<ActionResponse<Contact>
     if (!contact) {
       return { success: false, error: 'Contact not found' };
     }
-    revalidatePath('/family/contacts');
+    revalidatePath('/dashboard/resources/contacts');
     return { success: true, data: contact };
   } catch (error) {
     console.error('Error deleting contact:', error);
@@ -188,7 +188,7 @@ export async function toggleContactArchiveStatus(id: number, isArchived: boolean
     if (!contact) {
       return { success: false, error: 'Contact not found' };
     }
-    revalidatePath('/family/contacts');
+    revalidatePath('/dashboard/resources/contacts');
     return { success: true, data: contact };
   } catch (error) {
     console.error('Error updating contact archive status:', error);
@@ -203,7 +203,7 @@ export async function batchDeleteContacts(ids: number[]): Promise<ActionResponse
       .where(sql`${contacts.id} IN (${ids.join(',')})`)
       .returning();
     
-    revalidatePath('/family/contacts');
+    revalidatePath('/dashboard/resources/contacts');
     return { success: true, data: { count: result.length } };
   } catch (error) {
     console.error('Error batch deleting contacts:', error);
@@ -218,7 +218,7 @@ export async function batchArchiveContacts(ids: number[], isArchived: boolean): 
       .where(sql`${contacts.id} IN (${ids.join(',')})`)
       .returning();
     
-    revalidatePath('/family/contacts');
+    revalidatePath('/dashboard/resources/contacts');
     return { success: true, data: { count: result.length } };
   } catch (error) {
     console.error('Error batch archiving contacts:', error);

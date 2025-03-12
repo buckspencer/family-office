@@ -1,89 +1,61 @@
-'use client';
-
 import React from 'react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
-import { ContactCard } from '@/components/ui/contact-card';
-import { Contact } from '@/lib/db/temp-schema/contacts.types';
-import { getContacts, deleteContact } from './actions';
-import { useRouter } from 'next/navigation';
-import { BackButton } from '@/components/ui/back-button';
+import { getContacts } from '@/lib/db/actions/contacts';
+import { ContactsClientPage } from './contacts-client';
+import { getSession } from '@/lib/auth/session';
 
-export default function ContactsPage() {
-  const [contacts, setContacts] = React.useState<Contact[]>([]);
-  const router = useRouter();
+export const metadata = {
+  title: 'Contacts | Family Office',
+  description: 'Manage your family and professional contacts',
+};
 
-  React.useEffect(() => {
-    async function fetchContacts() {
-      try {
-        const result = await getContacts();
-        if ('contacts' in result) {
-          setContacts(result.contacts);
-        }
-      } catch (error) {
-        console.error('Failed to fetch contacts:', error);
-      }
-    }
-    fetchContacts();
-  }, []);
+// Define the Contact type to match the one in contacts-table
+type Contact = {
+  id: number;
+  name: string;
+  type: 'family' | 'medical' | 'financial' | 'legal' | 'service' | 'other';
+  relationship: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  isArchived?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
+  teamId: number;
+  userId: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-  const handleEdit = (contact: Contact) => {
-    router.push(`/dashboard/resources/contacts/${contact.id}/edit`);
+export default async function ContactsPage() {
+  const session = await getSession();
+  
+  // Use type assertion to help TypeScript understand the structure
+  type SessionUser = {
+    id: number;
+    email: string;
+    name: string;
+    teamId?: number;
   };
-
-  const handleDelete = async (contact: Contact) => {
-    if (confirm('Are you sure you want to delete this contact?')) {
-      try {
-        const formData = new FormData();
-        formData.append('id', contact.id.toString());
-        const result = await deleteContact(formData);
-        
-        if ('error' in result) {
-          throw new Error(result.error);
-        }
-        
-        setContacts(contacts.filter(c => c.id !== contact.id));
-      } catch (error) {
-        console.error('Failed to delete contact:', error);
-        alert('Failed to delete contact. Please try again.');
-      }
-    }
-  };
-
-  return (
-    <div className="container mx-auto p-6">
-      <BackButton 
-        href="/dashboard/resources" 
-        label="Back to Resources Dashboard"
-      />
-      
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Contacts</h1>
-        <Link href="/dashboard/resources/contacts/new">
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Contact
-          </Button>
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {contacts.length === 0 ? (
-          <div className="col-span-full text-center py-12">
-            <p className="text-muted-foreground">No contacts yet. Add your first contact to get started.</p>
-          </div>
-        ) : (
-          contacts.map((contact) => (
-            <ContactCard
-              key={contact.id}
-              contact={contact}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
+  
+  const user = session?.user as SessionUser | undefined;
+  const teamId = user?.teamId ?? 1; // Default to 1 if not available
+  
+  const response = await getContacts(teamId);
+  
+  // Map the response data to match the Contact type
+  const contacts: Contact[] = response.success && response.data 
+    ? response.data.map((contact: any) => ({
+        ...contact,
+        // Convert null values to undefined to match the Contact type
+        email: contact.email || undefined,
+        phone: contact.phone || undefined,
+        address: contact.address || undefined,
+        notes: contact.notes || undefined,
+        tags: contact.tags || undefined,
+        metadata: contact.metadata || undefined,
+      }))
+    : [];
+  
+  return <ContactsClientPage initialContacts={contacts} />;
 } 
