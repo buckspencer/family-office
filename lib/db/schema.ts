@@ -157,6 +157,7 @@ export const eventType = pgEnum('event_type', ['birthday', 'anniversary', 'holid
 export const subscriptionType = pgEnum('subscription_type', ['service', 'membership', 'subscription', 'other']);
 export const billingFrequency = pgEnum('billing_frequency', ['monthly', 'quarterly', 'yearly', 'one-time']);
 export const subscriptionStatus = pgEnum('subscription_status', ['active', 'cancelled', 'pending', 'failed']);
+export const assetType = pgEnum('asset_type', ['property', 'vehicle', 'investment', 'insurance', 'other']);
 
 // Documents table
 export const documents = pgTable('documents', {
@@ -246,6 +247,43 @@ export const subscriptions = pgTable('subscriptions', {
   updatedAt: timestamp('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
+// Assets table
+export const assets = pgTable('assets', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: assetType('type').notNull(),
+  description: text('description').notNull(),
+  value: decimal('value', { precision: 15, scale: 2 }).notNull(),
+  purchaseDate: timestamp('purchase_date'),
+  purchasePrice: decimal('purchase_price', { precision: 15, scale: 2 }),
+  location: text('location'),
+  notes: text('notes'),
+  isArchived: boolean('is_archived').default(false),
+  tags: text('tags').array(),
+  metadata: jsonb('metadata'),
+  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+// Attachments table for file uploads
+export const attachments = pgTable('attachments', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  fileUrl: text('file_url').notNull(),
+  fileSize: integer('file_size'),
+  fileType: varchar('file_type', { length: 100 }),
+  resourceType: varchar('resource_type', { length: 50 }).notNull(),
+  resourceId: integer('resource_id').notNull(),
+  isArchived: boolean('is_archived').default(false),
+  metadata: jsonb('metadata'),
+  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
 // Zod schemas for validation
 export const insertDocumentSchema = createInsertSchema(documents);
 export const selectDocumentSchema = createSelectSchema(documents);
@@ -259,6 +297,12 @@ export const selectEventSchema = createSelectSchema(events);
 export const insertSubscriptionSchema = createInsertSchema(subscriptions);
 export const selectSubscriptionSchema = createSelectSchema(subscriptions);
 
+export const insertAssetSchema = createInsertSchema(assets);
+export const selectAssetSchema = createSelectSchema(assets);
+
+export const insertAttachmentSchema = createInsertSchema(attachments);
+export const selectAttachmentSchema = createSelectSchema(attachments);
+
 // Types
 export type Document = typeof documents.$inferSelect;
 export type DocumentInsert = typeof documents.$inferInsert;
@@ -271,3 +315,9 @@ export type EventInsert = typeof events.$inferInsert;
 
 export type Subscription = typeof subscriptions.$inferSelect;
 export type SubscriptionInsert = typeof subscriptions.$inferInsert;
+
+export type Asset = typeof assets.$inferSelect;
+export type AssetInsert = typeof assets.$inferInsert;
+
+export type Attachment = typeof attachments.$inferSelect;
+export type AttachmentInsert = typeof attachments.$inferInsert;

@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Manrope } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth/auth-provider';
 import { UserProvider } from '@/lib/auth';
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
   title: 'Family - The Family Office Software for the average family',

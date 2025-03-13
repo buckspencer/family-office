@@ -1,14 +1,25 @@
-import { Asset } from '@/lib/db/temp-schema/assets.types';
+import { Asset } from '@/lib/db/schema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { ArrowRight } from 'lucide-react';
 
 interface AssetCardProps {
   asset: Asset;
 }
 
 export function AssetCard({ asset }: AssetCardProps) {
+  // Helper function to format currency with N/A fallback
+  const formatValue = (value: string | number | null | undefined) => {
+    if (!value || value === '0' || isNaN(parseFloat(value.toString()))) {
+      return 'N/A';
+    }
+    return formatCurrency(parseFloat(value.toString()));
+  };
+
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>{asset.name}</span>
@@ -17,12 +28,12 @@ export function AssetCard({ asset }: AssetCardProps) {
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">{asset.description}</p>
+      <CardContent className="flex-1 flex flex-col">
+        <div className="space-y-2 flex-1">
+          <p className="text-sm text-muted-foreground">{asset.description || 'N/A'}</p>
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Value:</span>
-            <span className="text-sm">{formatCurrency(asset.value)}</span>
+            <span className="text-sm">{formatValue(asset.value)}</span>
           </div>
           {asset.purchaseDate && (
             <div className="flex justify-between items-center">
@@ -35,7 +46,7 @@ export function AssetCard({ asset }: AssetCardProps) {
           {asset.purchasePrice && (
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Purchase Price:</span>
-              <span className="text-sm">{formatCurrency(asset.purchasePrice)}</span>
+              <span className="text-sm">{formatValue(asset.purchasePrice)}</span>
             </div>
           )}
           {asset.location && (
@@ -44,6 +55,15 @@ export function AssetCard({ asset }: AssetCardProps) {
               <span className="text-sm">{asset.location}</span>
             </div>
           )}
+        </div>
+        
+        <div className="mt-4 pt-4 border-t">
+          <Link href={`/dashboard/resources/assets/${asset.id}`}>
+            <Button variant="ghost" className="w-full justify-between">
+              View Details
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>

@@ -1,144 +1,215 @@
-import { Asset, AssetCreate, AssetUpdate } from '@/lib/db/temp-schema/assets.types';
+'use server';
 
-// This will be replaced with actual database operations
-const assets: Asset[] = [
-  {
-    id: 1,
-    name: 'Primary Residence',
-    type: 'property',
-    description: 'Family home in suburban area',
-    value: 750000,
-    purchaseDate: new Date('2020-06-15'),
-    purchasePrice: 650000,
-    location: '123 Main St, Anytown, USA',
-    notes: '3 bedrooms, 2 bathrooms, 2,500 sq ft',
-    teamId: 1,
-    userId: 1,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-  {
-    id: 2,
-    name: 'Tesla Model 3',
-    type: 'vehicle',
-    description: 'Electric vehicle for daily commute',
-    value: 45000,
-    purchaseDate: new Date('2023-03-20'),
-    purchasePrice: 48000,
-    location: 'Garage at home',
-    notes: 'Autopilot enabled, premium interior',
-    teamId: 1,
-    userId: 1,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-  {
-    id: 3,
-    name: 'Vanguard Index Fund',
-    type: 'investment',
-    description: 'S&P 500 index fund for retirement',
-    value: 250000,
-    purchaseDate: new Date('2022-01-10'),
-    purchasePrice: 200000,
-    notes: 'Monthly contributions of $1,000',
-    teamId: 1,
-    userId: 1,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-  {
-    id: 4,
-    name: 'Life Insurance Policy',
-    type: 'insurance',
-    description: 'Term life insurance for family protection',
-    value: 1000000,
-    purchaseDate: new Date('2021-08-05'),
-    purchasePrice: 1200,
-    notes: '20-year term, $100 monthly premium',
-    teamId: 1,
-    userId: 1,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-  {
-    id: 5,
-    name: 'Vacation Home',
-    type: 'property',
-    description: 'Beachfront property for family vacations',
-    value: 1200000,
-    purchaseDate: new Date('2023-11-30'),
-    purchasePrice: 1150000,
-    location: '456 Ocean Dr, Beach City, USA',
-    notes: '4 bedrooms, 3 bathrooms, ocean view',
-    teamId: 1,
-    userId: 1,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-  },
-];
+import { db } from '@/lib/db';
+import { assets, Asset, AssetInsert } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { getSession } from '@/lib/auth/session';
+import { revalidatePath } from 'next/cache';
 
-export async function getAssetsByTeam(teamId: number): Promise<Asset[]> {
-  if (!teamId) throw new Error('Team ID is required');
-  return assets.filter(asset => asset.teamId === teamId);
-}
-
-export async function getAssetById(id: number): Promise<Asset | null> {
-  if (!id) throw new Error('Asset ID is required');
-  return assets.find(asset => asset.id === id) || null;
-}
-
-export async function getAssetsByUser(userId: number): Promise<Asset[]> {
-  if (!userId) throw new Error('User ID is required');
-  return assets.filter(asset => asset.userId === userId);
-}
-
-export async function getAssetsByTeamAndType(teamId: number, type: Asset['type']): Promise<Asset[]> {
-  if (!teamId) throw new Error('Team ID is required');
-  if (!type) throw new Error('Asset type is required');
-  return assets.filter(asset => asset.teamId === teamId && asset.type === type);
-}
-
-export async function createAsset(data: AssetCreate & { teamId: number; userId: number }): Promise<Asset> {
-  if (!data.teamId) throw new Error('Team ID is required');
-  if (!data.userId) throw new Error('User ID is required');
-  if (!data.name) throw new Error('Name is required');
-  if (!data.type) throw new Error('Type is required');
-  if (!data.description) throw new Error('Description is required');
-  if (typeof data.value !== 'number') throw new Error('Value must be a number');
-
-  const newAsset: Asset = {
-    id: assets.length + 1,
-    ...data,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  assets.push(newAsset);
-  return newAsset;
-}
-
-export async function updateAsset(id: number, data: AssetUpdate): Promise<Asset | null> {
-  if (!id) throw new Error('Asset ID is required');
-  if (data.value !== undefined && typeof data.value !== 'number') {
-    throw new Error('Value must be a number');
+// Define the session type based on what getSession returns
+type Session = {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    teamId: number;
   }
+};
 
-  const assetIndex = assets.findIndex(asset => asset.id === id);
-  if (assetIndex === -1) return null;
+export async function getAssets() {
+  try {
+    const session = await getSession() as Session | null;
+    if (!session || !session.user.teamId) {
+      return { error: 'Unauthorized' };
+    }
 
-  assets[assetIndex] = {
-    ...assets[assetIndex],
-    ...data,
-    updatedAt: new Date(),
-  };
+    const teamId = session.user.teamId;
+    const result = await db.query.assets.findMany({
+      where: and(
+        eq(assets.teamId, teamId),
+        eq(assets.isArchived, false)
+      ),
+      orderBy: assets.createdAt,
+    });
 
-  return assets[assetIndex];
+    return { assets: result };
+  } catch (error) {
+    console.error('Error fetching assets:', error);
+    return { error: 'Failed to fetch assets' };
+  }
 }
 
-export async function deleteAsset(id: number): Promise<boolean> {
-  if (!id) throw new Error('Asset ID is required');
-  const assetIndex = assets.findIndex(asset => asset.id === id);
-  if (assetIndex === -1) return false;
+export async function getAssetById(id: number) {
+  try {
+    const session = await getSession() as Session | null;
+    if (!session || !session.user.teamId) {
+      return { error: 'Unauthorized' };
+    }
 
-  assets.splice(assetIndex, 1);
-  return true;
+    const teamId = session.user.teamId;
+    const result = await db.query.assets.findFirst({
+      where: and(
+        eq(assets.id, id),
+        eq(assets.teamId, teamId)
+      ),
+    });
+
+    if (!result) {
+      return { error: 'Asset not found' };
+    }
+
+    return { asset: result };
+  } catch (error) {
+    console.error('Error fetching asset:', error);
+    return { error: 'Failed to fetch asset' };
+  }
+}
+
+export async function createAsset(formData: FormData) {
+  try {
+    const session = await getSession() as Session | null;
+    if (!session || !session.user.teamId) {
+      return { error: 'Unauthorized' };
+    }
+
+    const name = formData.get('name') as string;
+    const type = formData.get('type') as string;
+    const description = formData.get('description') as string;
+    const valueStr = formData.get('value') as string;
+    const value = parseFloat(valueStr);
+
+    // Validate required fields
+    if (!name || !type || !description || isNaN(value)) {
+      return { error: 'Missing or invalid required fields' };
+    }
+
+    // Optional fields
+    const purchaseDateStr = formData.get('purchaseDate') as string;
+    const purchaseDate = purchaseDateStr ? new Date(purchaseDateStr) : undefined;
+    
+    const purchasePriceStr = formData.get('purchasePrice') as string;
+    const purchasePrice = purchasePriceStr ? parseFloat(purchasePriceStr) : undefined;
+    
+    const location = formData.get('location') as string;
+    const notes = formData.get('notes') as string;
+
+    const newAsset: AssetInsert = {
+      name,
+      type: type as any, // Type assertion needed for enum
+      description,
+      value: value.toString(), // Convert to string for database
+      purchaseDate: purchaseDate,
+      purchasePrice: purchasePrice?.toString(), // Convert to string for database
+      location: location || undefined,
+      notes: notes || undefined,
+      teamId: session.user.teamId,
+      userId: parseInt(session.user.id), // Convert string ID to number
+    };
+
+    const [result] = await db.insert(assets).values(newAsset).returning();
+    
+    revalidatePath('/dashboard/resources/assets');
+    return { data: result };
+  } catch (error) {
+    console.error('Error creating asset:', error);
+    return { error: 'Failed to create asset' };
+  }
+}
+
+export async function updateAsset(id: number, formData: FormData) {
+  try {
+    const session = await getSession() as Session | null;
+    if (!session || !session.user.teamId) {
+      return { error: 'Unauthorized' };
+    }
+
+    // Check if asset exists and belongs to the team
+    const existingAsset = await db.query.assets.findFirst({
+      where: and(
+        eq(assets.id, id),
+        eq(assets.teamId, session.user.teamId)
+      ),
+    });
+
+    if (!existingAsset) {
+      return { error: 'Asset not found' };
+    }
+
+    const name = formData.get('name') as string;
+    const type = formData.get('type') as string;
+    const description = formData.get('description') as string;
+    const valueStr = formData.get('value') as string;
+    const value = parseFloat(valueStr);
+
+    // Validate required fields
+    if (!name || !type || !description || isNaN(value)) {
+      return { error: 'Missing or invalid required fields' };
+    }
+
+    // Optional fields
+    const purchaseDateStr = formData.get('purchaseDate') as string;
+    const purchaseDate = purchaseDateStr ? new Date(purchaseDateStr) : null;
+    
+    const purchasePriceStr = formData.get('purchasePrice') as string;
+    const purchasePrice = purchasePriceStr ? parseFloat(purchasePriceStr) : null;
+    
+    const location = formData.get('location') as string;
+    const notes = formData.get('notes') as string;
+
+    const updatedAsset = {
+      name,
+      type: type as any, // Type assertion needed for enum
+      description,
+      value: value.toString(), // Convert to string for database
+      purchaseDate,
+      purchasePrice: purchasePrice !== null ? purchasePrice.toString() : null, // Convert to string for database
+      location: location || null,
+      notes: notes || null,
+    };
+
+    const [result] = await db
+      .update(assets)
+      .set(updatedAsset)
+      .where(eq(assets.id, id))
+      .returning();
+    
+    revalidatePath('/dashboard/resources/assets');
+    return { data: result };
+  } catch (error) {
+    console.error('Error updating asset:', error);
+    return { error: 'Failed to update asset' };
+  }
+}
+
+export async function deleteAsset(id: number) {
+  try {
+    const session = await getSession() as Session | null;
+    if (!session || !session.user.teamId) {
+      return { error: 'Unauthorized' };
+    }
+
+    // Check if asset exists and belongs to the team
+    const existingAsset = await db.query.assets.findFirst({
+      where: and(
+        eq(assets.id, id),
+        eq(assets.teamId, session.user.teamId)
+      ),
+    });
+
+    if (!existingAsset) {
+      return { error: 'Asset not found' };
+    }
+
+    // Soft delete by setting isArchived to true
+    await db
+      .update(assets)
+      .set({ isArchived: true })
+      .where(eq(assets.id, id));
+    
+    revalidatePath('/dashboard/resources/assets');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting asset:', error);
+    return { error: 'Failed to delete asset' };
+  }
 } 

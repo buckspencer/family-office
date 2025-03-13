@@ -1,5 +1,5 @@
-import NewAssetForm from './new-asset-form';
+import AssetForm from '../components/asset-form';
 
 export default function NewAssetPage() {
-  return <NewAssetForm />;
+  return <AssetForm mode="create" />;
 } 
