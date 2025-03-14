@@ -4,52 +4,36 @@ export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
 
 export type SubscriptionStatus = 'active' | 'cancelled' | 'pending' | 'failed';
 
-export interface Subscription {
+export interface DbSubscription {
   id: number;
   name: string;
   type: SubscriptionType;
   description: string;
-  amount: number;
+  amount: string;
   billingFrequency: BillingFrequency;
   startDate: Date;
-  endDate?: Date;
-  autoRenew: boolean;
-  category?: string;
-  notes?: string;
-  paymentMethod?: string;
-  lastBilled?: Date;
-  nextBilling?: Date;
+  endDate: Date | null;
+  autoRenew: boolean | null;
+  category: string | null;
+  notes: string | null;
+  paymentMethod: string | null;
+  lastBilled: Date | null;
+  nextBilling: Date | null;
   status: SubscriptionStatus;
-  isArchived?: boolean;
-  tags?: string[];
-  metadata?: Record<string, any>;
+  isArchived: boolean | null;
+  tags: string[] | null;
+  metadata: unknown | null;
   teamId: number;
-  userId: number;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface SubscriptionCreate {
-  name: string;
-  type: SubscriptionType;
-  description: string;
+export interface Subscription extends Omit<DbSubscription, 'amount'> {
   amount: number;
-  billingFrequency: BillingFrequency;
-  startDate: Date;
-  endDate?: Date;
-  autoRenew: boolean;
-  category?: string;
-  notes?: string;
-  paymentMethod?: string;
-  lastBilled?: Date;
-  nextBilling?: Date;
-  status: SubscriptionStatus;
-  isArchived?: boolean;
-  tags?: string[];
-  metadata?: Record<string, any>;
-  teamId: number;
-  userId: number;
 }
+
+export interface SubscriptionCreate extends Omit<Subscription, 'id' | 'createdAt' | 'updatedAt'> {}
 
 export interface SubscriptionUpdate {
   name?: string;
@@ -58,7 +42,7 @@ export interface SubscriptionUpdate {
   amount?: number;
   billingFrequency?: BillingFrequency;
   startDate?: Date;
-  endDate?: Date;
+  endDate?: Date | null;
   autoRenew?: boolean;
   category?: string;
   notes?: string;
@@ -69,4 +53,6 @@ export interface SubscriptionUpdate {
   isArchived?: boolean;
   tags?: string[];
   metadata?: Record<string, any>;
+  teamId?: number;
+  userId?: string;
 } 

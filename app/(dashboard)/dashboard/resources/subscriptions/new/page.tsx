@@ -1,5 +1,5 @@
-import NewSubscriptionForm from './new-subscription-form';
+import { SubscriptionForm } from '../components/subscription-form';
 
 export default function NewSubscriptionPage() {
-  return <NewSubscriptionForm />;
+  return <SubscriptionForm mode="create" />;
 } 

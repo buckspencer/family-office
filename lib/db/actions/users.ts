@@ -1,42 +1,37 @@
 import { desc, and, eq, isNull } from 'drizzle-orm';
 import { db } from '../drizzle';
 import { users, teamMembers } from '../schema';
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/session';
+import { createServerClient } from '@/lib/supabase-server';
+import { getUserFromDatabase } from '@/lib/auth/supabase-sync';
 
+/**
+ * Get the current authenticated user from the database
+ * This uses Supabase Auth for authentication and retrieves the corresponding database user
+ */
 export async function getUser() {
-  const sessionCookie = (await cookies()).get('session');
-  if (!sessionCookie || !sessionCookie.value) {
+  try {
+    // Get the Supabase Auth user
+    const serverClient = await createServerClient();
+    const { data: { user: supabaseUser }, error } = await serverClient.auth.getUser();
+    
+    if (error || !supabaseUser) {
+      return null;
+    }
+    
+    // Get the corresponding database user
+    const dbUser = await getUserFromDatabase(supabaseUser.id);
+    return dbUser;
+  } catch (error) {
+    console.error('Error getting user:', error);
     return null;
   }
-
-  const sessionData = await verifyToken(sessionCookie.value);
-  if (
-    !sessionData ||
-    !sessionData.user ||
-    typeof sessionData.user.id !== 'number'
-  ) {
-    return null;
-  }
-
-  if (new Date(sessionData.expires) < new Date()) {
-    return null;
-  }
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.id, sessionData.user.id), isNull(users.deletedAt)))
-    .limit(1);
-
-  if (user.length === 0) {
-    return null;
-  }
-
-  return user[0];
 }
 
-export async function getUserWithTeam(userId: number) {
+/**
+ * Get a user with their team information
+ * @param userId The UUID of the user
+ */
+export async function getUserWithTeam(userId: string) {
   const result = await db
     .select({
       user: users,

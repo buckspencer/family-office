@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { getMiddlewareSession } from '@/lib/auth/middleware-session';
 
 export async function middleware(request: NextRequest) {
   console.log('Middleware executing for path:', request.nextUrl.pathname);
@@ -12,13 +12,13 @@ export async function middleware(request: NextRequest) {
   // Create a Supabase client configured to use cookies
   const supabase = createMiddlewareClient({ req: request, res });
   
-  // Refresh session if expired - required for Server Components
-  const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+  // Use getUser() for more security instead of getSession()
+  const { data: { user }, error } = await supabase.auth.getUser();
   
-  console.log('Middleware: Supabase session check result:', {
-    hasSession: !!supabaseSession,
-    user: supabaseSession?.user?.email || 'none',
-    expires: supabaseSession?.expires_at ? new Date(supabaseSession.expires_at * 1000).toISOString() : 'none'
+  console.log('Middleware: Supabase user check result:', {
+    hasUser: !!user,
+    user: user?.email || 'none',
+    error: error?.message || 'none'
   });
   
   // Check if the request is for a protected route
@@ -33,20 +33,22 @@ export async function middleware(request: NextRequest) {
   if (isProtectedRoute) {
     console.log('Middleware: Checking authentication for protected route:', request.nextUrl.pathname);
     
-    // First check Supabase Auth
-    if (supabaseSession) {
+    // Check if user is authenticated
+    if (user) {
       // User is authenticated with Supabase
       console.log('Middleware: User authenticated with Supabase', {
-        user: supabaseSession.user.email,
-        user_id: supabaseSession.user.id,
-        expires_at: supabaseSession.expires_at ? new Date(supabaseSession.expires_at * 1000).toISOString() : 'unknown'
+        user: user.email,
+        user_id: user.id,
       });
+      
+      // Get the formatted session
+      const session = await getMiddlewareSession(request, res);
       
       // Set the user ID in the request headers for use in the API routes
       const requestHeaders = new Headers(request.headers);
-      requestHeaders.set('x-user-id', supabaseSession.user.id);
+      requestHeaders.set('x-user-id', user.id);
       
-      // Return the response with the updated headers
+      // Create a response with the updated headers
       const response = NextResponse.next({
         request: {
           headers: requestHeaders,
@@ -58,11 +60,14 @@ export async function middleware(request: NextRequest) {
         response.headers.append('Set-Cookie', cookie);
       });
       
+      // We don't need to set a custom session cookie anymore
+      // Supabase Auth handles session cookies automatically
+      
       return response;
     }
     
-    // If no Supabase session, redirect to auth page
-    console.log('Middleware: No Supabase session found, redirecting to auth');
+    // If no authenticated user, redirect to auth page
+    console.log('Middleware: No authenticated user found, redirecting to auth');
     return NextResponse.redirect(new URL('/auth', request.url));
   }
   

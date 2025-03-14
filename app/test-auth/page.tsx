@@ -1,122 +1,73 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+import { useSession } from '@/lib/hooks/useSession';
 
-export default function TestAuthPage() {
-  const [sessionInfo, setSessionInfo] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [localStorageData, setLocalStorageData] = useState<any>(null);
+export default function TestAuth() {
+  const { user, isLoading, error } = useSession();
+  const [apiSession, setApiSession] = useState<any>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function checkSession() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          throw error;
-        }
-        
-        setSessionInfo(data);
-        console.log('Session data:', data);
-        
-        // Get localStorage data
-        if (typeof window !== 'undefined') {
-          const storageData = {
-            auth_redirect: localStorage.getItem('auth_redirect'),
-            auth_user_id: localStorage.getItem('auth_user_id'),
-            supabase_auth_token: localStorage.getItem('supabase.auth.token')
-          };
-          setLocalStorageData(storageData);
-          console.log('localStorage data:', storageData);
-        }
-      } catch (err) {
-        console.error('Error checking session:', err);
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    checkSession();
-  }, []);
-  
-  const handleSignOut = async () => {
+  // Test the API endpoint
+  const fetchApiSession = async () => {
+    setApiLoading(true);
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Clear localStorage
-      localStorage.removeItem('auth_redirect');
-      localStorage.removeItem('auth_user_id');
-      
-      // Refresh the page to update session info
-      window.location.reload();
+      const response = await fetch('/api/auth/session');
+      const data = await response.json();
+      setApiSession(data);
     } catch (err) {
-      console.error('Error signing out:', err);
-      setError(err instanceof Error ? err.message : String(err));
+      console.error('Error fetching API session:', err);
+      setApiError('Failed to fetch session from API');
     } finally {
-      setLoading(false);
+      setApiLoading(false);
     }
-  };
-  
-  const handleGoToDashboard = () => {
-    window.location.href = '/dashboard';
   };
 
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-2xl font-bold mb-6">Auth Test Page</h1>
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-6">Authentication Test Page</h1>
       
-      {loading ? (
-        <div>Loading session information...</div>
-      ) : error ? (
-        <div className="p-4 bg-red-100 text-red-800 rounded-md mb-4">
-          Error: {error}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="p-4 bg-gray-100 rounded-md">
-            <h2 className="text-lg font-semibold mb-2">Session Information</h2>
-            <pre className="whitespace-pre-wrap bg-gray-800 text-gray-200 p-4 rounded-md overflow-auto max-h-96">
-              {JSON.stringify(sessionInfo, null, 2)}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Client-Side Session (useSession hook)</h2>
+        {isLoading ? (
+          <p>Loading session...</p>
+        ) : error ? (
+          <p className="text-red-500">Error: {error}</p>
+        ) : user ? (
+          <div className="bg-green-100 p-4 rounded">
+            <p className="font-medium">Authenticated as:</p>
+            <pre className="bg-gray-100 p-2 mt-2 rounded overflow-auto">
+              {JSON.stringify(user, null, 2)}
             </pre>
           </div>
-          
-          {localStorageData && (
-            <div className="p-4 bg-gray-100 rounded-md">
-              <h2 className="text-lg font-semibold mb-2">localStorage Data</h2>
-              <pre className="whitespace-pre-wrap bg-gray-800 text-gray-200 p-4 rounded-md overflow-auto max-h-96">
-                {JSON.stringify(localStorageData, null, 2)}
-              </pre>
-            </div>
-          )}
-          
-          <div className="flex gap-4 flex-wrap">
-            {sessionInfo?.session ? (
-              <>
-                <Button onClick={handleGoToDashboard}>
-                  Go to Dashboard
-                </Button>
-                <Button variant="destructive" onClick={handleSignOut}>
-                  Sign Out
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => window.location.href = '/auth'}>
-                Go to Login
-              </Button>
-            )}
+        ) : (
+          <p className="bg-yellow-100 p-4 rounded">Not authenticated</p>
+        )}
+      </div>
+
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Server API Session Test</h2>
+        <button
+          onClick={fetchApiSession}
+          disabled={apiLoading}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        >
+          {apiLoading ? 'Loading...' : 'Test API Session'}
+        </button>
+        
+        {apiError && (
+          <p className="text-red-500 mt-2">{apiError}</p>
+        )}
+        
+        {apiSession && (
+          <div className="mt-4">
+            <pre className="bg-gray-100 p-4 rounded overflow-auto">
+              {JSON.stringify(apiSession, null, 2)}
+            </pre>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 } 

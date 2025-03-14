@@ -5,10 +5,7 @@ import { db } from '@/lib/db';
 import { eq, desc, and, sql, gte, lte } from 'drizzle-orm';
 import { subscriptions, subscriptionType, billingFrequency, subscriptionStatus } from '../schema';
 import { z } from 'zod';
-
-// Define types based on the schema
-type Subscription = typeof subscriptions.$inferSelect;
-type NewSubscription = typeof subscriptions.$inferInsert;
+import { DbSubscription, Subscription } from '@/lib/db/temp-schema/subscriptions.types';
 
 type ActionResponse<T> = {
   success: boolean;
@@ -17,8 +14,11 @@ type ActionResponse<T> = {
 };
 
 // Database Operations
-async function createSubscriptionQuery(data: NewSubscription) {
-  return db.insert(subscriptions).values(data).returning();
+async function createSubscriptionQuery(data: Omit<DbSubscription, 'id' | 'createdAt' | 'updatedAt'>) {
+  return db.insert(subscriptions).values(data).returning().then(results => results.map(subscription => ({
+    ...subscription,
+    amount: parseFloat(subscription.amount)
+  })));
 }
 
 async function getSubscriptionsQuery(teamId: number, options?: { 
@@ -32,7 +32,7 @@ async function getSubscriptionsQuery(teamId: number, options?: {
   billingFrequency?: typeof billingFrequency.enumValues[number];
   nextBillingBefore?: Date;
   nextBillingAfter?: Date;
-}) {
+}): Promise<Subscription[]> {
   const { 
     limit = 100, 
     offset = 0, 
@@ -74,32 +74,55 @@ async function getSubscriptionsQuery(teamId: number, options?: {
     conditions = and(conditions, gte(subscriptions.nextBilling, nextBillingAfter));
   }
   
-  return db.select()
+  const results = await db.select()
     .from(subscriptions)
     .where(conditions)
     .orderBy(sql`${orderColumn} ${orderDirection}`)
     .limit(limit)
     .offset(offset);
+
+  return results.map(subscription => ({
+    ...subscription,
+    amount: parseFloat(subscription.amount)
+  }));
 }
 
-async function getSubscriptionByIdQuery(id: number) {
-  return db.select()
+async function getSubscriptionByIdQuery(id: number): Promise<Subscription[]> {
+  const [subscription] = await db.select()
     .from(subscriptions)
     .where(eq(subscriptions.id, id))
     .limit(1);
+
+  if (!subscription) return [];
+
+  return [{
+    ...subscription,
+    amount: parseFloat(subscription.amount)
+  }];
 }
 
-async function updateSubscriptionQuery(id: number, data: Partial<Subscription>) {
+async function updateSubscriptionQuery(id: number, data: Partial<DbSubscription>) {
   return db.update(subscriptions)
-    .set({ ...data, updatedAt: new Date() })
+    .set({
+      ...data,
+      updatedAt: new Date()
+    })
     .where(eq(subscriptions.id, id))
-    .returning();
+    .returning()
+    .then(results => results.map(subscription => ({
+      ...subscription,
+      amount: parseFloat(subscription.amount)
+    })));
 }
 
 async function deleteSubscriptionQuery(id: number) {
   return db.delete(subscriptions)
     .where(eq(subscriptions.id, id))
-    .returning();
+    .returning()
+    .then(results => results.map(subscription => ({
+      ...subscription,
+      amount: parseFloat(subscription.amount)
+    })));
 }
 
 // Input validation schemas
@@ -107,22 +130,22 @@ const createSubscriptionSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(subscriptionType.enumValues),
   description: z.string(),
-  amount: z.string().or(z.number().transform(n => n.toString())),
+  amount: z.number().min(0, "Amount must be greater than or equal to 0"),
   billingFrequency: z.enum(billingFrequency.enumValues),
   startDate: z.date(),
-  endDate: z.date().nullish(),
-  autoRenew: z.boolean().default(true),
-  category: z.string().nullish(),
-  notes: z.string().nullish(),
-  paymentMethod: z.string().nullish(),
-  lastBilled: z.date().nullish(),
-  nextBilling: z.date().nullish(),
+  endDate: z.date().nullable(),
+  autoRenew: z.boolean().nullable(),
+  category: z.string().nullable(),
+  notes: z.string().nullable(),
+  paymentMethod: z.string().nullable(),
+  lastBilled: z.date().nullable(),
+  nextBilling: z.date().nullable(),
   status: z.enum(subscriptionStatus.enumValues).default('active'),
-  isArchived: z.boolean().default(false),
-  tags: z.array(z.string()).nullish(),
-  metadata: z.record(z.any()).nullish(),
+  isArchived: z.boolean().nullable(),
+  tags: z.array(z.string()).nullable(),
+  metadata: z.record(z.any()).nullable(),
   teamId: z.number(),
-  userId: z.number()
+  userId: z.string()
 });
 
 const updateSubscriptionSchema = createSubscriptionSchema.partial();
@@ -133,8 +156,21 @@ export async function createSubscription(data: z.infer<typeof createSubscription
     // Validate input
     const validatedData = createSubscriptionSchema.parse(data);
     
-    const [subscription] = await createSubscriptionQuery(validatedData);
-    revalidatePath('/family/subscriptions');
+    const [subscription] = await createSubscriptionQuery({
+      ...validatedData,
+      amount: validatedData.amount.toString(),
+      autoRenew: validatedData.autoRenew ?? null,
+      isArchived: validatedData.isArchived ?? null,
+      tags: validatedData.tags ?? null,
+      metadata: validatedData.metadata ?? null,
+      category: validatedData.category ?? null,
+      notes: validatedData.notes ?? null,
+      paymentMethod: validatedData.paymentMethod ?? null,
+      lastBilled: validatedData.lastBilled ?? null,
+      nextBilling: validatedData.nextBilling ?? null,
+      endDate: validatedData.endDate ?? null
+    });
+    revalidatePath('/dashboard/resources/subscriptions');
     return { success: true, data: subscription };
   } catch (error) {
     console.error('Error creating subscription:', error);
@@ -187,11 +223,24 @@ export async function updateSubscription(id: number, data: z.infer<typeof update
     // Validate input
     const validatedData = updateSubscriptionSchema.parse(data);
     
-    const [subscription] = await updateSubscriptionQuery(id, validatedData);
+    const [subscription] = await updateSubscriptionQuery(id, {
+      ...validatedData,
+      amount: validatedData.amount?.toString(),
+      autoRenew: validatedData.autoRenew ?? null,
+      isArchived: validatedData.isArchived ?? null,
+      tags: validatedData.tags ?? null,
+      metadata: validatedData.metadata ?? null,
+      category: validatedData.category ?? null,
+      notes: validatedData.notes ?? null,
+      paymentMethod: validatedData.paymentMethod ?? null,
+      lastBilled: validatedData.lastBilled ?? null,
+      nextBilling: validatedData.nextBilling ?? null,
+      endDate: validatedData.endDate ?? null
+    });
     if (!subscription) {
       return { success: false, error: 'Subscription not found' };
     }
-    revalidatePath('/family/subscriptions');
+    revalidatePath('/dashboard/resources/subscriptions');
     return { success: true, data: subscription };
   } catch (error) {
     console.error('Error updating subscription:', error);
@@ -208,7 +257,7 @@ export async function deleteSubscription(id: number): Promise<ActionResponse<Sub
     if (!subscription) {
       return { success: false, error: 'Subscription not found' };
     }
-    revalidatePath('/family/subscriptions');
+    revalidatePath('/dashboard/resources/subscriptions');
     return { success: true, data: subscription };
   } catch (error) {
     console.error('Error deleting subscription:', error);
@@ -223,7 +272,7 @@ export async function toggleSubscriptionArchiveStatus(id: number, isArchived: bo
     if (!subscription) {
       return { success: false, error: 'Subscription not found' };
     }
-    revalidatePath('/family/subscriptions');
+    revalidatePath('/dashboard/resources/subscriptions');
     return { success: true, data: subscription };
   } catch (error) {
     console.error('Error updating subscription archive status:', error);
@@ -238,7 +287,7 @@ export async function updateSubscriptionStatus(id: number, status: typeof subscr
     if (!subscription) {
       return { success: false, error: 'Subscription not found' };
     }
-    revalidatePath('/family/subscriptions');
+    revalidatePath('/dashboard/resources/subscriptions');
     return { success: true, data: subscription };
   } catch (error) {
     console.error('Error updating subscription status:', error);
@@ -251,9 +300,13 @@ export async function batchDeleteSubscriptions(ids: number[]): Promise<ActionRes
   try {
     const result = await db.delete(subscriptions)
       .where(sql`${subscriptions.id} IN (${ids.join(',')})`)
-      .returning();
+      .returning()
+      .then(results => results.map(subscription => ({
+        ...subscription,
+        amount: parseFloat(subscription.amount)
+      })));
     
-    revalidatePath('/family/subscriptions');
+    revalidatePath('/dashboard/resources/subscriptions');
     return { success: true, data: { count: result.length } };
   } catch (error) {
     console.error('Error batch deleting subscriptions:', error);
@@ -266,9 +319,13 @@ export async function batchArchiveSubscriptions(ids: number[], isArchived: boole
     const result = await db.update(subscriptions)
       .set({ isArchived, updatedAt: new Date() })
       .where(sql`${subscriptions.id} IN (${ids.join(',')})`)
-      .returning();
+      .returning()
+      .then(results => results.map(subscription => ({
+        ...subscription,
+        amount: parseFloat(subscription.amount)
+      })));
     
-    revalidatePath('/family/subscriptions');
+    revalidatePath('/dashboard/resources/subscriptions');
     return { success: true, data: { count: result.length } };
   } catch (error) {
     console.error('Error batch archiving subscriptions:', error);

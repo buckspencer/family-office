@@ -1,20 +1,29 @@
 import { compare, hash } from 'bcryptjs';
-import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
-import { NewUser } from '@/lib/db/schema';
-import { 
-  signInWithSupabase, 
-  signUpWithSupabase, 
-  signOutFromSupabase,
-  getCurrentSupabaseUser,
-  getSupabaseSession
-} from './supabase';
 import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase-server';
+import { getCurrentUser, syncUserWithDatabase } from './supabase-sync';
+import { db } from '@/lib/db';
+import { teamMembers } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 
-const secretKey = process.env.JWT_SECRET || 'your-secret-key';
-const key = new TextEncoder().encode(secretKey);
 const SALT_ROUNDS = 10;
 
+// Define a standard session user type
+export type SessionUser = {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+  teamId?: number;
+};
+
+export type Session = {
+  user: SessionUser;
+};
+
+/**
+ * Password utility functions
+ */
 export async function hashPassword(password: string) {
   return hash(password, SALT_ROUNDS);
 }
@@ -26,84 +35,105 @@ export async function comparePasswords(
   return compare(plainTextPassword, hashedPassword);
 }
 
-export async function signToken(payload: any) {
-  return await new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1d')
-    .sign(key);
-}
-
-export async function verifyToken(token: string) {
+/**
+ * Get the current user session
+ * This is the single source of truth for user authentication on the server
+ */
+export async function getSession(): Promise<Session | null> {
   try {
-    const { payload } = await jwtVerify(token, key);
-    return payload;
-  } catch (error) {
-    throw new Error('Invalid token');
-  }
-}
-
-export async function getSession() {
-  // First try to get the Supabase session
-  const { data: { session: supabaseSession } } = await supabase.auth.getSession();
-  
-  if (supabaseSession) {
+    // Get the current user with database sync
+    const user = await getCurrentUser();
+    
+    if (!user) {
+      return null;
+    }
+    
+    // If user doesn't have a teamId yet, try to find one from team_members table
+    let teamId = user.teamId;
+    
+    if (!teamId) {
+      // Look up team membership
+      const membershipResults = await db
+        .select({ teamId: teamMembers.teamId })
+        .from(teamMembers)
+        .where(eq(teamMembers.userId, user.id))
+        .limit(1);
+      
+      if (membershipResults.length > 0) {
+        teamId = membershipResults[0].teamId;
+        
+        // Update user metadata with teamId for future use
+        await supabase.auth.updateUser({
+          data: { teamId }
+        });
+      }
+    }
+    
     return {
       user: {
-        id: supabaseSession.user.id,
-        email: supabaseSession.user.email || '',
-        name: supabaseSession.user.user_metadata?.name || supabaseSession.user.email?.split('@')[0] || '',
-        teamId: supabaseSession.user.user_metadata?.teamId || 1,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        teamId
       }
     };
-  }
-  
-  // Fall back to the custom session
-  const cookieStore = await cookies();
-  const token = cookieStore.get('session')?.value;
-  
-  if (!token) {
-    return null;
-  }
-  
-  try {
-    const payload = await verifyToken(token);
-    return payload;
   } catch (error) {
+    console.error('Unexpected error in getSession:', error);
     return null;
   }
 }
 
-export async function setSession(user: NewUser) {
-  // Set both our custom session and sign in with Supabase
-  const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const session: any = {
-    user: {
-      id: user.id!,
-      email: user.email || '',
-      name: user.name || user.email?.split('@')[0] || '',
-    },
-    expires: expiresInOneDay.toISOString(),
-  };
-  const encryptedSession = await signToken(session);
-  (await cookies()).set('session', encryptedSession, {
-    expires: expiresInOneDay,
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-  });
-  
-  // We don't await this because we don't want to block the response
-  // This is just to keep Supabase in sync
+/**
+ * Get the current user
+ */
+export async function getUser(): Promise<SessionUser | null> {
   try {
-    if (user.email && user.passwordHash) {
-      // This is a simplified approach - in a real app, you'd need to handle this differently
-      // since we can't recover the plain text password
-      // For now, we'll just sign in if the user already exists
-      await signInWithSupabase(user.email, user.passwordHash);
+    // Get the current user with database sync
+    const user = await getCurrentUser();
+    
+    if (!user) {
+      return null;
     }
+    
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      teamId: user.teamId
+    };
   } catch (error) {
-    console.error('Error syncing with Supabase:', error);
-    // We don't throw here because we still want to set our custom session
+    console.error('Error in getUser:', error);
+    return null;
+  }
+}
+
+/**
+ * Set user session by signing in with Supabase
+ * This replaces the old setSession function with a simpler version that just uses Supabase
+ */
+export async function setSession(user: { email: string, password: string }) {
+  if (!user.email) {
+    throw new Error('Email is required to set session');
+  }
+  
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: user.password,
+    });
+    
+    if (error) throw error;
+    
+    // Sync the user with our database
+    if (data.user) {
+      await syncUserWithDatabase(data.user);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error setting session:', error);
+    throw error;
   }
 }

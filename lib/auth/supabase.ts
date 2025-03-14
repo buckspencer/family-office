@@ -1,15 +1,26 @@
-import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { syncUserWithDatabase } from './supabase-sync';
 
 // Function to sign up a user with Supabase
-export async function signUpWithSupabase(email: string, password: string) {
+export async function signUpWithSupabase(email: string, password: string, metadata?: Record<string, any>) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      data: metadata
+    }
   });
   
   if (error) {
     throw new Error(error.message);
+  }
+  
+  // Sync the new user with our database
+  if (data.user) {
+    // TODO: Ensure team creation happens reliably on user creation
+    // Consider implementing a more robust solution using webhooks
+    // See the TODO in lib/auth/supabase-sync.ts for more details
+    await syncUserWithDatabase(data.user);
   }
   
   return data;
@@ -26,6 +37,11 @@ export async function signInWithSupabase(email: string, password: string) {
     throw new Error(error.message);
   }
   
+  // Sync the user with our database
+  if (data.user) {
+    await syncUserWithDatabase(data.user);
+  }
+  
   return data;
 }
 
@@ -40,34 +56,27 @@ export async function signOutFromSupabase() {
   return true;
 }
 
-// Function to get the current user from Supabase
-export async function getCurrentSupabaseUser() {
-  const { data: { user }, error } = await supabase.auth.getUser();
+// Function to update user metadata in Supabase
+export async function updateUserMetadata(metadata: Record<string, any>) {
+  const { data, error } = await supabase.auth.updateUser({
+    data: metadata
+  });
   
   if (error) {
-    console.error('Error getting user:', error);
-    return null;
+    throw new Error(error.message);
   }
   
-  return user;
-}
-
-// Function to get the current session from Supabase
-export async function getSupabaseSession() {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  
-  if (error) {
-    console.error('Error getting session:', error);
-    return null;
+  // Sync the updated user with our database
+  if (data.user) {
+    await syncUserWithDatabase(data.user);
   }
   
-  return session;
+  return data;
 }
 
-// Function to sync Supabase user with our database user
+// This function is now replaced by the syncUserWithDatabase function in supabase-sync.ts
 export async function syncSupabaseUser(supabaseUser: any, dbUser: any) {
-  // This function will be implemented to sync the Supabase user with our database user
-  // For now, we'll just return the users
+  console.warn('This function is deprecated. Use syncUserWithDatabase from supabase-sync.ts instead.');
   return {
     supabaseUser,
     dbUser
