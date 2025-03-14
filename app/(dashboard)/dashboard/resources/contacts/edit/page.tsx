@@ -2,9 +2,15 @@ import { getContactById } from '@/lib/db/actions/contacts';
 import EditContactForm from './edit-contact-form';
 import { notFound } from 'next/navigation';
 
-export default async function EditContactPage({ searchParams }: { searchParams: { id?: string } }) {
+interface EditContactPageProps {
+  searchParams: Promise<{
+    id?: string;
+  }>;
+}
+
+export default async function EditContactPage({ searchParams }: EditContactPageProps) {
   // Await searchParams before accessing its properties
-  const params = await Promise.resolve(searchParams);
+  const params = await searchParams;
   const id = params.id ? parseInt(params.id, 10) : null;
   
   if (!id) {

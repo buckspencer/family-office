@@ -37,7 +37,7 @@ async function logActivity(
   }
   const newActivity: NewActivityLog = {
     teamId,
-    userId,
+    userId: userId.toString(),
     action: type,
     ipAddress: ipAddress || '',
   };

@@ -10,9 +10,9 @@ import { getSubscriptionById } from '@/lib/db/actions/subscriptions';
 import DeleteSubscriptionButton from '../delete-subscription-button';
 
 interface SubscriptionPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 const formatCurrency = (amount: number) => {

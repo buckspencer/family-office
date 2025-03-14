@@ -20,7 +20,8 @@ export default async function SettingsPage() {
     redirect('/sign-in');
   }
 
-  const teamData = await getTeamForUser(user.id);
+  const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id;
+  const teamData = await getTeamForUser(userId);
 
   if (!teamData) {
     throw new Error('Team not found');

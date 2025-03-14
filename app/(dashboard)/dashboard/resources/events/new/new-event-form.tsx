@@ -36,6 +36,28 @@ const eventTypes = [
   { value: 'other', label: 'Other' },
 ] as const;
 
+// Define Event type to match the schema
+type Event = {
+  id: number;
+  title: string;
+  type: 'birthday' | 'anniversary' | 'holiday' | 'reminder' | 'other';
+  description?: string | null;
+  startDate: Date;
+  endDate?: Date | null;
+  location?: string | null;
+  notes?: string | null;
+  isRecurring: boolean | null;
+  recurringPattern?: string | null;
+  reminderBefore?: number | null;
+  isArchived: boolean | null;
+  tags?: string[] | null;
+  metadata?: unknown;
+  teamId: number;
+  userId: string | number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 type ActionState = {
   success: boolean;
   data?: Event;
@@ -57,7 +79,9 @@ async function handleCreateEvent(state: ActionState, formData: FormData): Promis
     notes: formData.get('notes') as string,
     // Temporary values for development
     teamId: 1,
-    userId: 1,
+    userId: 1, // Keep as number
+    isArchived: false,
+    isRecurring: false
   };
 
   const result = await createEvent(data);

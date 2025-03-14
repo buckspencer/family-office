@@ -39,11 +39,11 @@ type Contact = {
   phone?: string | null;
   address?: string | null;
   notes?: string | null;
-  isArchived?: boolean;
+  isArchived?: boolean | null;
   tags?: string[] | null;
-  metadata?: Record<string, any> | null;
+  metadata?: unknown;
   teamId: number;
-  userId: number;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
 };

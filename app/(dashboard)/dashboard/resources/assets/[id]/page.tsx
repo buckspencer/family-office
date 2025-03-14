@@ -3,8 +3,19 @@ import { getAttachments } from '@/lib/db/actions/attachments';
 import AssetDetails from './asset-details';
 import { Attachment } from '@/lib/db/schema';
 
-export default async function AssetPage({ params }: { params: { id: string } }) {
-  const assetId = parseInt(params.id);
+interface AssetPageProps {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+export default async function AssetPage({ params }: AssetPageProps) {
+  const { id: idString } = await params;
+  const assetId = parseInt(idString, 10);
+  
+  if (isNaN(assetId)) {
+    throw new Error("Invalid asset ID");
+  }
   
   // Fetch asset details
   const assetResult = await getAssetById(assetId);

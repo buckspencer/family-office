@@ -84,7 +84,7 @@ export async function createAsset(formData: FormData) {
       notes: notes || undefined,
       metadata,
       teamId,
-      userId,
+      userId: userId.toString(), // Ensure this is a string
       isArchived: false,
     };
 

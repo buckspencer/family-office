@@ -4,9 +4,9 @@ import { getDocumentById } from '@/lib/db/actions/documents';
 import EditDocumentForm from './edit-document-form';
 
 interface EditDocumentPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function EditDocumentPage({ params }: EditDocumentPageProps) {

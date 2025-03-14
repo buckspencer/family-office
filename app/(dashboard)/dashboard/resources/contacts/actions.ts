@@ -109,7 +109,7 @@ export async function createContact(data: FormData) {
         address,
         notes,
         teamId,
-        userId
+        userId: userId.toString()
       });
       
       if (!result.success) {
@@ -210,7 +210,7 @@ export async function updateContact(data: FormData) {
         address,
         notes,
         teamId,
-        userId
+        userId: userId.toString()
       });
       
       if (!result.success) {

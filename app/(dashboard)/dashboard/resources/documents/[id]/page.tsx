@@ -21,9 +21,9 @@ const formatDate = (date: Date | string) => {
 };
 
 interface DocumentPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function DocumentPage({ params }: DocumentPageProps) {

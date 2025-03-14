@@ -3,9 +3,9 @@ import { SubscriptionForm } from '../../components/subscription-form';
 import { notFound } from 'next/navigation';
 
 interface EditSubscriptionPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function EditSubscriptionPage({ params }: EditSubscriptionPageProps) {
