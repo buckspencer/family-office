@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Paperclip, X, FileText, Image, File, Download, Trash2 } from 'lucide-react';
+import { Paperclip, FileText, Image, File, Download, Trash2 } from 'lucide-react';
 import { createAttachment, deleteAttachment } from '@/lib/db/actions/attachments';
 import { uploadFile, deleteFile } from '@/lib/supabase';
 import { Attachment } from '@/lib/db/schema';
@@ -102,7 +102,7 @@ export function AttachmentUploader({
       setUploadProgress(100);
       
       // Update local state
-      const newAttachments = [...attachments, result.data];
+      const newAttachments = [...attachments, result.data].filter(Boolean) as Attachment[];
       onAttachmentsChange?.(newAttachments);
       
       toast({

@@ -22,7 +22,7 @@ type NewDocument = {
   tags?: string[] | null;
   metadata?: Record<string, any> | null;
   teamId: number;
-  userId: number;
+  userId: string;
 };
 
 type ActionResponse<T> = {
@@ -96,7 +96,7 @@ const createDocumentSchema = z.object({
   tags: z.array(z.string()).nullable().optional(),
   metadata: z.record(z.any()).nullable().optional(),
   teamId: z.number(),
-  userId: z.number()
+  userId: z.string()
 });
 
 const updateDocumentSchema = createDocumentSchema.partial();

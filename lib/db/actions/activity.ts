@@ -30,7 +30,7 @@ export async function createActivityLog({
   action,
 }: {
   teamId: number;
-  userId: number;
+  userId: string;
   action: string;
 }) {
   try {

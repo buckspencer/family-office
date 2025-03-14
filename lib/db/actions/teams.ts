@@ -30,7 +30,7 @@ export async function updateTeamSubscription(
     .where(eq(teams.id, teamId));
 }
 
-export async function getTeamForUser(userId: number) {
+export async function getTeamForUser(userId: string) {
   const result = await db.query.users.findFirst({
     where: eq(users.id, userId),
     with: {

@@ -119,7 +119,7 @@ const createEventSchema = z.object({
   tags: z.array(z.string()).nullish(),
   metadata: z.record(z.any()).nullish(),
   teamId: z.number(),
-  userId: z.number()
+  userId: z.string()
 });
 
 const updateEventSchema = createEventSchema.partial();

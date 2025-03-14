@@ -20,7 +20,7 @@ export default async function SettingsPage() {
     redirect('/sign-in');
   }
 
-  const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id;
+  const userId = user.id;
   const teamData = await getTeamForUser(userId);
 
   if (!teamData) {

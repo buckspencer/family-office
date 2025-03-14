@@ -4,7 +4,7 @@ import { createServerClient } from '@/lib/supabase-server';
 import { getCurrentUser, syncUserWithDatabase } from './supabase-sync';
 import { db } from '@/lib/db';
 import { teamMembers } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 const SALT_ROUNDS = 10;
 
@@ -15,6 +15,7 @@ export type SessionUser = {
   name: string;
   role?: string;
   teamId?: number;
+  passwordHash?: string;
 };
 
 export type Session = {
@@ -30,8 +31,11 @@ export async function hashPassword(password: string) {
 
 export async function comparePasswords(
   plainTextPassword: string,
-  hashedPassword: string
+  hashedPassword: string | null | undefined
 ) {
+  if (!hashedPassword) {
+    return false;
+  }
   return compare(plainTextPassword, hashedPassword);
 }
 
@@ -110,18 +114,33 @@ export async function getUser(): Promise<SessionUser | null> {
 }
 
 /**
- * Set user session by signing in with Supabase
- * This replaces the old setSession function with a simpler version that just uses Supabase
+ * Set a session for a user
  */
-export async function setSession(user: { email: string, password: string }) {
+export async function setSession(user: { id?: string, email: string, passwordHash?: string | null }) {
   if (!user.email) {
     throw new Error('Email is required to set session');
   }
   
   try {
+    // For users with passwordHash, we need to use a different approach
+    // This is a workaround for the existing code structure
+    if (user.id && !user.passwordHash) {
+      // Just sync the user with our database
+      const serverClient = await createServerClient();
+      const { data: { user: supabaseUser }, error } = await serverClient.auth.getUser();
+      
+      if (error || !supabaseUser) {
+        throw new Error('Failed to get user from Supabase');
+      }
+      
+      await syncUserWithDatabase(supabaseUser);
+      return true;
+    }
+    
+    // Original flow for password-based authentication
     const { data, error } = await supabase.auth.signInWithPassword({
       email: user.email,
-      password: user.password,
+      password: user.passwordHash || '',
     });
     
     if (error) throw error;

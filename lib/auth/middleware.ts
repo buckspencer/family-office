@@ -66,7 +66,7 @@ export function withTeam<T>(action: ActionWithTeamFunction<T>) {
       redirect('/sign-in');
     }
 
-    const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id;
+    const userId = user.id;
     const team = await getTeamForUser(userId);
     if (!team) {
       throw new Error('Team not found');

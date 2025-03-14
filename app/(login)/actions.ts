@@ -25,10 +25,11 @@ import {
   validatedAction,
   validatedActionWithUser,
 } from '@/lib/auth/middleware';
+import { v4 as uuidv4 } from 'uuid';
 
 async function logActivity(
   teamId: number | null | undefined,
-  userId: number,
+  userId: string | number,
   type: ActivityType,
   ipAddress?: string,
 ) {
@@ -126,6 +127,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   const passwordHash = await hashPassword(password);
 
   const newUser: NewUser = {
+    id: uuidv4(),
     email,
     passwordHash,
     role: 'owner', // Default role, will be overridden if there's an invitation

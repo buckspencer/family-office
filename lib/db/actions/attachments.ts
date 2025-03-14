@@ -1,11 +1,33 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { attachments, AttachmentInsert } from '@/lib/db/schema';
+import { attachments, AttachmentInsert, teamMembers } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+
+/**
+ * Get the team ID for a user
+ */
+async function getUserTeamId(userId: string): Promise<number> {
+  try {
+    const teamMember = await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, userId))
+      .limit(1);
+    
+    if (teamMember.length === 0) {
+      return 1; // Fallback to team ID 1 if no team is found
+    }
+    
+    return teamMember[0].teamId;
+  } catch (error) {
+    console.error('Error getting user team ID:', error);
+    return 1; // Fallback to team ID 1 if there's an error
+  }
+}
 
 /**
  * Get attachments for a specific resource
@@ -62,8 +84,8 @@ export async function createAttachment(data: {
       return { error: 'Unauthorized' };
     }
 
-    const userId = parseInt(session.user.id);
-    const teamId = session.user.user_metadata?.teamId ?? 1; // Fallback to 1 for development
+    const userId = session.user.id;
+    const teamId = await getUserTeamId(userId);
 
     // Validate required fields
     if (!data.name || !data.fileUrl || !data.resourceType || !data.resourceId) {

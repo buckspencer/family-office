@@ -103,7 +103,7 @@ export default function NewDocumentForm() {
         notes: values.description || null,
         fileUrl: result.url,
         teamId: 1, // Default team ID
-        userId: parseInt(user.id) || 1, // Use Supabase user ID or default
+        userId: user.id, // Use Supabase user ID directly
       });
       
       if (!response.success) {

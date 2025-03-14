@@ -33,7 +33,7 @@ export interface Subscription extends Omit<DbSubscription, 'amount'> {
   amount: number;
 }
 
-export interface SubscriptionCreate extends Omit<Subscription, 'id' | 'createdAt' | 'updatedAt'> {}
+export type SubscriptionCreate = Omit<Subscription, 'id' | 'createdAt' | 'updatedAt'>;
 
 export interface SubscriptionUpdate {
   name?: string;

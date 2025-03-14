@@ -103,7 +103,7 @@ export async function createAsset(formData: FormData) {
       location: location || undefined,
       notes: notes || undefined,
       teamId: session.user.teamId,
-      userId: parseInt(session.user.id), // Convert string ID to number
+      userId: session.user.id, // Use the UUID directly
     };
 
     const [result] = await db.insert(assets).values(newAsset).returning();

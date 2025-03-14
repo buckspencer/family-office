@@ -79,7 +79,7 @@ async function handleCreateEvent(state: ActionState, formData: FormData): Promis
     notes: formData.get('notes') as string,
     // Temporary values for development
     teamId: 1,
-    userId: 1, // Keep as number
+    userId: '1', // Use string for UUID
     isArchived: false,
     isRecurring: false
   };
