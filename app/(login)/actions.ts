@@ -26,6 +26,7 @@ import {
   validatedActionWithUser,
 } from '@/lib/auth/middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { createClient } from '@supabase/supabase-js';
 
 async function logActivity(
   teamId: number | null | undefined,
@@ -74,12 +75,18 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
 
   const { user: foundUser, team: foundTeam } = userWithTeam[0];
 
-  const isPasswordValid = await comparePasswords(
-    password,
-    foundUser.passwordHash,
+  // Use Supabase Auth for authentication instead of password hash
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+  
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
-  if (!isPasswordValid) {
+  if (error) {
     return {
       error: 'Invalid email or password. Please try again.',
       email,
@@ -129,8 +136,8 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   const newUser: NewUser = {
     id: uuidv4(),
     email,
-    passwordHash,
     role: 'owner', // Default role, will be overridden if there's an invitation
+    name: '', // Assuming name is not provided in the signUp schema
   };
 
   const [createdUser] = await db.insert(users).values(newUser).returning();
@@ -264,13 +271,21 @@ export const updatePassword = validatedActionWithUser(
     const newPasswordHash = await hashPassword(newPassword);
     const userWithTeam = await getUserWithTeam(user.id);
 
-    await Promise.all([
-      db
-        .update(users)
-        .set({ passwordHash: newPasswordHash })
-        .where(eq(users.id, user.id)),
-      logActivity(userWithTeam?.teamId, user.id, ActivityType.UPDATE_PASSWORD),
-    ]);
+    // Update password in Supabase Auth
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    
+    if (updateError) {
+      return { error: 'Failed to update password. Please try again.' };
+    }
+
+    await logActivity(userWithTeam?.teamId, user.id, ActivityType.UPDATE_PASSWORD);
 
     return { success: 'Password updated successfully.' };
   },

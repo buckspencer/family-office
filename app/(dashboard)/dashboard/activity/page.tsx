@@ -12,25 +12,88 @@ import {
   FileText,
   FileEdit,
   FileX,
+  Archive,
+  RefreshCw,
+  Trash,
+  Calendar,
+  CalendarPlus,
+  CalendarX,
+  CreditCard,
+  DollarSign,
+  Home,
+  Car,
+  Briefcase,
+  Paperclip,
+  Upload,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { ActivityType } from '@/lib/db/schema';
 import { getActivityLogs } from '@/lib/db/actions/activity';
 
-const iconMap: Record<ActivityType, LucideIcon> = {
+// Use Partial<Record> to allow for missing keys
+const iconMap: Partial<Record<ActivityType, LucideIcon>> = {
+  // Auth activities
   [ActivityType.SIGN_UP]: UserPlus,
   [ActivityType.SIGN_IN]: Lock,
   [ActivityType.SIGN_OUT]: LogOut,
   [ActivityType.UPDATE_PASSWORD]: Lock,
   [ActivityType.DELETE_ACCOUNT]: UserMinus,
   [ActivityType.UPDATE_ACCOUNT]: UserCog,
-  [ActivityType.CREATE_TEAM]: UserPlus,
+  
+  // Team activities
+  [ActivityType.CREATE_TEAM]: Users,
+  [ActivityType.UPDATE_TEAM]: Users,
+  [ActivityType.DELETE_TEAM]: Trash,
   [ActivityType.REMOVE_TEAM_MEMBER]: UserMinus,
   [ActivityType.INVITE_TEAM_MEMBER]: Mail,
   [ActivityType.ACCEPT_INVITATION]: CheckCircle,
+  
+  // Document activities
+  [ActivityType.GET_DOCUMENTS]: FileText,
+  [ActivityType.GET_DOCUMENT_BY_ID]: FileText,
   [ActivityType.CREATE_DOCUMENT]: FileText,
   [ActivityType.UPDATE_DOCUMENT]: FileEdit,
   [ActivityType.DELETE_DOCUMENT]: FileX,
+  [ActivityType.ARCHIVE_DOCUMENT]: Archive,
+  [ActivityType.RESTORE_DOCUMENT]: RefreshCw,
+  [ActivityType.BATCH_DELETE_DOCUMENTS]: Trash,
+  [ActivityType.BATCH_ARCHIVE_DOCUMENTS]: Archive,
+  [ActivityType.GET_SIGNED_DOCUMENT_URL]: FileText,
+  
+  // Contact activities
+  [ActivityType.CREATE_CONTACT]: UserPlus,
+  [ActivityType.UPDATE_CONTACT]: UserCog,
+  [ActivityType.DELETE_CONTACT]: UserMinus,
+  [ActivityType.ARCHIVE_CONTACT]: Archive,
+  [ActivityType.RESTORE_CONTACT]: RefreshCw,
+  
+  // Event activities
+  [ActivityType.CREATE_EVENT]: CalendarPlus,
+  [ActivityType.UPDATE_EVENT]: Calendar,
+  [ActivityType.DELETE_EVENT]: CalendarX,
+  [ActivityType.ARCHIVE_EVENT]: Archive,
+  [ActivityType.RESTORE_EVENT]: RefreshCw,
+  
+  // Subscription activities
+  [ActivityType.CREATE_SUBSCRIPTION]: CreditCard,
+  [ActivityType.UPDATE_SUBSCRIPTION]: CreditCard,
+  [ActivityType.DELETE_SUBSCRIPTION]: CreditCard,
+  [ActivityType.ARCHIVE_SUBSCRIPTION]: Archive,
+  [ActivityType.RESTORE_SUBSCRIPTION]: RefreshCw,
+  [ActivityType.RENEW_SUBSCRIPTION]: RefreshCw,
+  [ActivityType.CANCEL_SUBSCRIPTION]: CreditCard,
+  
+  // Asset activities
+  [ActivityType.CREATE_ASSET]: Home,
+  [ActivityType.UPDATE_ASSET]: Home,
+  [ActivityType.DELETE_ASSET]: Trash,
+  [ActivityType.ARCHIVE_ASSET]: Archive,
+  [ActivityType.RESTORE_ASSET]: RefreshCw,
+  
+  // Attachment activities
+  [ActivityType.UPLOAD_ATTACHMENT]: Upload,
+  [ActivityType.DELETE_ATTACHMENT]: Trash,
 };
 
 function getRelativeTime(date: Date) {
@@ -48,6 +111,15 @@ function getRelativeTime(date: Date) {
 }
 
 function formatAction(action: ActivityType): string {
+  // Helper function to convert enum values to readable text
+  const formatEnumValue = (value: string) => {
+    return value
+      .split('_')
+      .map(word => word.charAt(0) + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  // Handle specific cases with custom messages
   switch (action) {
     case ActivityType.SIGN_UP:
       return 'You signed up';
@@ -75,8 +147,10 @@ function formatAction(action: ActivityType): string {
       return 'You updated a document';
     case ActivityType.DELETE_DOCUMENT:
       return 'You deleted a document';
+    
+    // For other actions, generate a readable message from the enum value
     default:
-      return 'Unknown action occurred';
+      return `You ${formatEnumValue(action).toLowerCase()}`;
   }
 }
 
