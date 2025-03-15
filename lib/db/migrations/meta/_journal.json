@@ -29,6 +29,20 @@
       "when": 1741976282581,
       "tag": "0003_woozy_zzzax",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1742062170944,
+      "tag": "0004_faulty_wolfsbane",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1742062170945,
+      "tag": "0005_activity_logs_consolidated",
+      "breakpoints": true
     }
   ]
 }

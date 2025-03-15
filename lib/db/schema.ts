@@ -20,7 +20,6 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
   name: varchar('name', { length: 100 }),
   email: varchar('email', { length: 255 }).notNull().unique(),
-  passwordHash: text('password_hash'),
   role: varchar('role', { length: 20 }).notNull().default('member'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -60,6 +59,7 @@ export const activityLogs = pgTable('activity_logs', {
   action: text('action').notNull(),
   timestamp: timestamp('timestamp').notNull().defaultNow(),
   ipAddress: varchar('ip_address', { length: 45 }),
+  metadata: jsonb('metadata'),
 });
 
 export const invitations = pgTable('invitations', {
@@ -137,19 +137,67 @@ export type TeamDataWithMembers = Team & {
 };
 
 export enum ActivityType {
+  // Auth activities
   SIGN_UP = 'SIGN_UP',
   SIGN_IN = 'SIGN_IN',
   SIGN_OUT = 'SIGN_OUT',
   UPDATE_PASSWORD = 'UPDATE_PASSWORD',
   DELETE_ACCOUNT = 'DELETE_ACCOUNT',
   UPDATE_ACCOUNT = 'UPDATE_ACCOUNT',
+  
+  // Team activities
   CREATE_TEAM = 'CREATE_TEAM',
+  UPDATE_TEAM = 'UPDATE_TEAM',
+  DELETE_TEAM = 'DELETE_TEAM',
   REMOVE_TEAM_MEMBER = 'REMOVE_TEAM_MEMBER',
   INVITE_TEAM_MEMBER = 'INVITE_TEAM_MEMBER',
   ACCEPT_INVITATION = 'ACCEPT_INVITATION',
+  
+  // Document activities
+  GET_DOCUMENTS = 'GET_DOCUMENTS',
+  GET_DOCUMENT_BY_ID = 'GET_DOCUMENT_BY_ID',
   CREATE_DOCUMENT = 'CREATE_DOCUMENT',
   UPDATE_DOCUMENT = 'UPDATE_DOCUMENT',
   DELETE_DOCUMENT = 'DELETE_DOCUMENT',
+  ARCHIVE_DOCUMENT = 'ARCHIVE_DOCUMENT',
+  RESTORE_DOCUMENT = 'RESTORE_DOCUMENT',
+  BATCH_DELETE_DOCUMENTS = 'BATCH_DELETE_DOCUMENTS',
+  BATCH_ARCHIVE_DOCUMENTS = 'BATCH_ARCHIVE_DOCUMENTS',
+  GET_SIGNED_DOCUMENT_URL = 'GET_SIGNED_DOCUMENT_URL',
+  
+  // Contact activities
+  CREATE_CONTACT = 'CREATE_CONTACT',
+  UPDATE_CONTACT = 'UPDATE_CONTACT',
+  DELETE_CONTACT = 'DELETE_CONTACT',
+  ARCHIVE_CONTACT = 'ARCHIVE_CONTACT',
+  RESTORE_CONTACT = 'RESTORE_CONTACT',
+  
+  // Event activities
+  CREATE_EVENT = 'CREATE_EVENT',
+  UPDATE_EVENT = 'UPDATE_EVENT',
+  DELETE_EVENT = 'DELETE_EVENT',
+  ARCHIVE_EVENT = 'ARCHIVE_EVENT',
+  RESTORE_EVENT = 'RESTORE_EVENT',
+  
+  // Subscription activities
+  CREATE_SUBSCRIPTION = 'CREATE_SUBSCRIPTION',
+  UPDATE_SUBSCRIPTION = 'UPDATE_SUBSCRIPTION',
+  DELETE_SUBSCRIPTION = 'DELETE_SUBSCRIPTION',
+  ARCHIVE_SUBSCRIPTION = 'ARCHIVE_SUBSCRIPTION',
+  RESTORE_SUBSCRIPTION = 'RESTORE_SUBSCRIPTION',
+  RENEW_SUBSCRIPTION = 'RENEW_SUBSCRIPTION',
+  CANCEL_SUBSCRIPTION = 'CANCEL_SUBSCRIPTION',
+  
+  // Asset activities
+  CREATE_ASSET = 'CREATE_ASSET',
+  UPDATE_ASSET = 'UPDATE_ASSET',
+  DELETE_ASSET = 'DELETE_ASSET',
+  ARCHIVE_ASSET = 'ARCHIVE_ASSET',
+  RESTORE_ASSET = 'RESTORE_ASSET',
+  
+  // Attachment activities
+  UPLOAD_ATTACHMENT = 'UPLOAD_ATTACHMENT',
+  DELETE_ATTACHMENT = 'DELETE_ATTACHMENT',
 }
 
 // Resource-related enums

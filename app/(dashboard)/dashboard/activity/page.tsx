@@ -80,10 +80,26 @@ function formatAction(action: ActivityType): string {
   }
 }
 
-export const dynamic = 'force-dynamic';
+// Define the type for activity logs
+type ActivityLog = {
+  id: number;
+  action: string;
+  timestamp: Date;
+  ipAddress: string | null;
+  userName: string | null;
+};
+
+export const revalidate = 60; // Revalidate this page every 60 seconds
 
 export default async function ActivityPage() {
-  const logs = await getActivityLogs();
+  let logs: ActivityLog[] = [];
+  
+  try {
+    logs = await getActivityLogs();
+  } catch (error) {
+    console.error('Error fetching activity logs:', error);
+    // Continue with empty logs array
+  }
 
   return (
     <section className="flex-1 p-4 lg:p-8">
