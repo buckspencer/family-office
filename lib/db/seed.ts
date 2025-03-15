@@ -3,6 +3,7 @@ import { db } from './drizzle';
 import { users, teams, teamMembers } from './schema';
 import { hashPassword } from '@/lib/auth/session';
 import { v4 as uuidv4 } from 'uuid';
+import { createClient } from '@supabase/supabase-js';
 
 async function createStripeProducts() {
   console.log('Creating Stripe products and prices...');
@@ -43,16 +44,33 @@ async function createStripeProducts() {
 async function seed() {
   const email = 'test@test.com';
   const password = 'admin123';
-  const passwordHash = await hashPassword(password);
-
+  
+  // Create user in Supabase Auth first
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  
+  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true
+  });
+  
+  if (authError) {
+    console.error('Error creating user in Supabase Auth:', authError);
+    throw authError;
+  }
+  
+  // Now create the user in our database
   const [user] = await db
     .insert(users)
     .values([
       {
-        id: uuidv4(),
+        id: authUser.user.id,
         email: email,
-        passwordHash: passwordHash,
         role: "owner",
+        name: "Admin User"
       },
     ])
     .returning();
