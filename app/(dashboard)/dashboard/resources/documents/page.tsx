@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { BackButton } from '@/components/ui/back-button';
 import { getDocuments } from '@/lib/db/actions/documents';
 import { cn } from '@/lib/utils';
+import { Document } from '@/lib/db/schema';
 
 // Helper function to format dates
 const formatDate = (date: Date | string) => {
@@ -25,13 +26,21 @@ const formatDate = (date: Date | string) => {
   });
 };
 
-// Remove mock data and use real data from the database
+// Add dynamic flag to prevent static rendering
+export const dynamic = 'force-dynamic';
 
 export default async function DocumentsPage() {
-  // Fetch documents from the database
-  // Using teamId 1 as a default for now - you might want to get this from auth context
-  const response = await getDocuments(1);
-  const documents = response.success ? response.data || [] : [];
+  // Wrap in try/catch to handle authentication errors during build
+  let documents: Document[] = [];
+  try {
+    // Fetch documents from the database
+    // Using teamId 1 as a default for now - you might want to get this from auth context
+    const response = await getDocuments(1);
+    documents = response.success ? response.data || [] : [];
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+    // Continue with empty documents array
+  }
 
   return (
     <div className="container mx-auto p-6">

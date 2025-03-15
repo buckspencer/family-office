@@ -1,8 +1,6 @@
 import { stripe } from '../payments/stripe';
 import { db } from './drizzle';
 import { users, teams, teamMembers } from './schema';
-import { hashPassword } from '@/lib/auth/session';
-import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 
 async function createStripeProducts() {
