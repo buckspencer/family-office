@@ -146,6 +146,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
         fileUrl: fileUrl,
         fileSize: fileUpload ? fileUpload.size : document.fileSize,
         fileType: fileUpload ? fileUpload.type : document.fileType,
+        teamId: document.teamId,
         updatedAt: new Date(),
       };
       

@@ -44,6 +44,66 @@ const s3Client = new S3Client({
   forcePathStyle: true,
 });
 
+// Helper function to ensure a bucket exists
+export async function ensureBucketExists(bucketName: string): Promise<{ success: boolean; error: Error | null }> {
+  try {
+    // Determine if we're in a browser environment
+    const isBrowser = typeof window !== 'undefined';
+    
+    // Use the appropriate client
+    const client = isBrowser ? createBrowserClient() : supabase;
+    
+    // Check if the bucket exists
+    const { data: buckets, error: listError } = await client.storage.listBuckets();
+    
+    if (listError) {
+      console.error('Error listing buckets:', listError);
+      return { success: false, error: new Error(`Failed to list buckets: ${listError.message}`) };
+    }
+    
+    // Check if our bucket exists
+    const bucketExists = buckets.some(b => b.name === bucketName);
+    
+    if (!bucketExists) {
+      console.log(`Bucket '${bucketName}' does not exist, creating it...`);
+      
+      // Create the bucket
+      const { data, error: createError } = await client.storage.createBucket(bucketName, {
+        public: true, // Make the bucket public
+        fileSizeLimit: 52428800, // 50MB limit
+      });
+      
+      if (createError) {
+        console.error(`Error creating bucket '${bucketName}':`, createError);
+        return { success: false, error: new Error(`Failed to create bucket: ${createError.message}`) };
+      }
+      
+      console.log(`Bucket '${bucketName}' created successfully`);
+      
+      // Set up RLS policies for the bucket
+      // This is a basic policy that allows authenticated users to upload files
+      const { error: policyError } = await client.rpc('create_storage_policy', {
+        bucket_name: bucketName,
+        policy_name: `${bucketName}_insert_policy`,
+        definition: `(bucket_id = '${bucketName}' AND auth.uid() = (storage.foldername(name))[1])::boolean`,
+        operation: 'INSERT'
+      });
+      
+      if (policyError) {
+        console.warn(`Error setting up RLS policy for bucket '${bucketName}':`, policyError);
+        // Don't fail the operation, just log the warning
+      }
+    } else {
+      console.log(`Bucket '${bucketName}' already exists`);
+    }
+    
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error ensuring bucket exists:', error);
+    return { success: false, error: error as Error };
+  }
+}
+
 /**
  * Upload a file to Supabase Storage
  * @param file The file to upload
@@ -59,6 +119,12 @@ export async function uploadFile(
   userId?: string | number
 ): Promise<{ url: string; error: Error | null }> {
   try {
+    // Determine if we're in a browser environment
+    const isBrowser = typeof window !== 'undefined';
+    
+    // Use the appropriate client
+    const client = isBrowser ? createBrowserClient() : supabase;
+    
     // Create a unique file name
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
@@ -66,7 +132,7 @@ export async function uploadFile(
     // Get the current user ID if not provided
     if (!userId) {
       console.log('No userId provided, attempting to get current user');
-      const { data, error: authError } = await supabase.auth.getUser();
+      const { data, error: authError } = await client.auth.getUser();
       
       if (authError) {
         console.error('Error getting current user:', authError);
@@ -88,7 +154,8 @@ export async function uploadFile(
       console.log('Got current user ID:', userId);
     }
     
-    // Build the file path - ALWAYS include userId as the first folder
+    // IMPORTANT: The folder structure must match the RLS policy
+    // The policy expects the first folder to be the user's ID
     let filePath = `${userId}/`;
     
     if (category) {
@@ -99,38 +166,8 @@ export async function uploadFile(
     
     console.log('Attempting to upload file to:', { bucket, filePath, fileSize: file.size, fileType: file.type });
     
-    // Check if the bucket exists
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    
-    if (bucketsError) {
-      console.error('Error listing buckets:', bucketsError);
-    } else {
-      const bucketExists = buckets.some(b => b.name === bucket);
-      console.log(`Bucket '${bucket}' exists:`, bucketExists);
-    }
-    
-    // Get the current authenticated user to check if it matches the userId
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (currentUser && currentUser.id !== userId) {
-      console.warn('Current authenticated user ID does not match the provided userId:', {
-        currentUserId: currentUser.id,
-        providedUserId: userId
-      });
-      
-      // If we're using a different userId than the current user, we need to check if the current user
-      // has permission to upload to that user's folder. In most cases, this will fail due to RLS.
-      console.log('Attempting to upload with current user ID instead:', currentUser.id);
-      
-      // Try with the current user's ID instead
-      filePath = `${currentUser.id}/`;
-      if (category) {
-        filePath += `${category}/`;
-      }
-      filePath += fileName;
-    }
-    
     // Upload the file to the specified bucket with upsert:true to overwrite if exists
-    const { data, error } = await supabase.storage
+    const { data, error } = await client.storage
       .from(bucket)
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -144,7 +181,7 @@ export async function uploadFile(
       if (error.message.includes('Permission denied') || error.message.includes('violates row-level security policy')) {
         return { 
           url: '', 
-          error: new Error(`Permission denied. Please check the bucket permissions in Supabase. Make sure the INSERT policy allows the current user (${currentUser?.id || userId}) to upload files. Error: ${error.message}`) 
+          error: new Error(`Permission denied. The RLS policy requires files to be uploaded to your own folder (${userId}/). Error: ${error.message}`) 
         };
       }
       
@@ -152,7 +189,7 @@ export async function uploadFile(
     }
     
     // Get the public URL
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = client.storage
       .from(bucket)
       .getPublicUrl(data.path);
     

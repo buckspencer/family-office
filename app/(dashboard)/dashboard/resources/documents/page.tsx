@@ -36,7 +36,13 @@ export default async function DocumentsPage() {
     // Fetch documents from the database
     // Using teamId 1 as a default for now - you might want to get this from auth context
     const response = await getDocuments(1);
-    documents = response.success ? response.data || [] : [];
+    
+    // Handle the case where response might be undefined
+    if (response && response.success) {
+      documents = response.data || [];
+    } else {
+      console.error('Invalid response from getDocuments:', response);
+    }
   } catch (error) {
     console.error('Error fetching documents:', error);
     // Continue with empty documents array

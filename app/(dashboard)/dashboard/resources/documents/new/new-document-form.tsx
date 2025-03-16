@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createDocument } from '@/lib/db/actions/documents';
 import { toast } from 'sonner';
-import { uploadFile, supabase } from '@/lib/supabase';
+import { uploadFile, supabase, createBrowserClient } from '@/lib/supabase';
 
 const documentCategories = [
   { value: 'identity', label: 'Identity Documents' },
@@ -71,43 +71,106 @@ export default function NewDocumentForm() {
     setIsSubmitting(true);
     
     try {
+      // Use the browser client instead of the server client
+      const supabaseBrowser = createBrowserClient();
+      
       // Get the current authenticated user from Supabase
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabaseBrowser.auth.getUser();
+      
+      if (authError) {
+        console.error('Authentication error:', authError);
+        toast.error('Authentication error', {
+          description: authError.message
+        });
+        setIsSubmitting(false);
+        return;
+      }
       
       if (!user) {
-        toast.error('You must be logged in to upload documents');
+        toast.error('Authentication required', {
+          description: 'You must be logged in to upload documents'
+        });
         setIsSubmitting(false);
         return;
       }
       
       if (!fileUpload) {
-        toast.error('Please select a file to upload');
+        toast.error('File required', {
+          description: 'Please select a file to upload'
+        });
         setIsSubmitting(false);
         return;
       }
       
-      // Upload the file to Supabase Storage
-      const result = await uploadFile(fileUpload, 'resources', 'documents', user.id);
+      console.log('Starting file upload process with:', {
+        fileName: fileUpload.name,
+        fileSize: fileUpload.size,
+        fileType: fileUpload.type,
+        userId: user.id
+      });
       
-      if (result.error) {
-        console.error('Upload error:', result.error);
-        toast.error(`Failed to upload file: ${result.error.message}`);
+      // Skip bucket existence check - we know it exists
+      
+      // Create a unique file name
+      const fileExt = fileUpload.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      
+      // Build the file path - ALWAYS include userId as the first folder
+      const filePath = `${user.id}/documents/${fileName}`;
+      
+      console.log('Attempting to upload file to:', { bucket: 'resources', filePath });
+      
+      // Upload the file directly
+      const { data, error: uploadError } = await supabaseBrowser.storage
+        .from('resources')
+        .upload(filePath, fileUpload, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('File upload failed', {
+          description: uploadError.message
+        });
         setIsSubmitting(false);
         return;
       }
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabaseBrowser.storage
+        .from('resources')
+        .getPublicUrl(data.path);
+      
+      console.log('File uploaded successfully:', { path: data.path, publicUrl });
+      
+      console.log('Creating document record with:', {
+        name: values.name,
+        category: values.category,
+        notes: values.description,
+        fileUrl: publicUrl,
+        teamId: 1,
+        userId: user.id
+      });
       
       // Create the document in the database
       const response = await createDocument({
         name: values.name,
         category: values.category,
         notes: values.description || null,
-        fileUrl: result.url,
+        fileUrl: publicUrl,
+        fileSize: fileUpload.size,
+        fileType: fileUpload.type,
         teamId: 1, // Default team ID
         userId: user.id, // Use Supabase user ID directly
       });
       
+      console.log('Document creation response:', response);
+      
       if (!response.success) {
-        toast.error(response.error || 'Failed to create document');
+        toast.error('Document creation failed', {
+          description: response.error || 'An unknown error occurred'
+        });
       } else {
         toast.success('Document created successfully');
         form.reset();
@@ -115,7 +178,9 @@ export default function NewDocumentForm() {
       }
     } catch (error) {
       console.error('Error creating document:', error);
-      toast.error('Failed to create document. Please try again.');
+      toast.error('Error', {
+        description: error instanceof Error ? error.message : 'Failed to create document'
+      });
     } finally {
       setIsSubmitting(false);
     }

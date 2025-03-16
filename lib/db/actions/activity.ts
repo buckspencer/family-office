@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm';
 import { db } from '../drizzle';
 import { activityLogs, users, type ActivityType } from '../schema';
 import { getSession } from '@/lib/auth/session';
+import { headers as nextHeaders } from 'next/headers';
 
 /**
  * Get recent activity logs for the current user
@@ -44,22 +45,32 @@ export async function logActivity({
   metadata = {},
 }: {
   action: ActivityType;
-  userId: string;
+  userId: string | undefined;
   teamId: number;
   metadata?: Record<string, any>;
 }) {
   try {
+    // If userId is undefined, use a placeholder
+    const safeUserId = userId || '00000000-0000-0000-0000-000000000000';
+    
+    // Get the IP address if possible
+    const ipAddress = 'server-side';
+    
+    // Skip headers in server components to avoid errors
+    // Headers can only be accessed in Route Handlers or Server Actions
+
+    // Insert the activity log
     await db.insert(activityLogs).values({
       action,
-      userId,
+      userId: safeUserId,
       teamId,
       timestamp: new Date(),
-      ipAddress: 'server-side',
-      metadata: metadata as any
+      ipAddress,
+      metadata,
     });
   } catch (error) {
-    console.error('Error logging activity:', error);
-    // Don't throw the error to prevent disrupting the main flow
+    // Don't let activity logging failures affect the main operation
+    console.error('Failed to log activity:', error);
   }
 }
 
@@ -77,7 +88,7 @@ export async function withActivityLog<T>({
   metadata = {},
 }: {
   action: ActivityType;
-  userId: string;
+  userId: string | undefined;
   teamId: number;
   resourceType: string;
   resourceId?: number | string;
@@ -118,6 +129,8 @@ export async function withActivityLog<T>({
         timestamp: new Date().toISOString()
       }
     });
+
+    // Re-throw the error
     throw error;
   }
 }
