@@ -18,8 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Search, Mail, Phone, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Mail, Phone, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { deleteContact, toggleContactArchiveStatus } from '@/lib/db/actions/contacts';
 import { useRouter } from 'next/navigation';
@@ -48,16 +47,7 @@ interface ContactsTableProps {
 
 export function ContactsTable({ initialContacts }: ContactsTableProps) {
   const [contacts, setContacts] = useState<Contact[]>(initialContacts);
-  const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
-
-  // Filter contacts based on search term
-  const filteredContacts = contacts.filter(contact => 
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.relationship.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.phone?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this contact?')) {
@@ -106,97 +96,82 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center space-x-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search contacts..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Relationship</TableHead>
+            <TableHead>Contact Info</TableHead>
+            <TableHead className="w-[100px]">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {contacts.length === 0 ? (
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Relationship</TableHead>
-              <TableHead>Contact Info</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableCell colSpan={5} className="h-24 text-center">
+                No contacts found.
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredContacts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  No contacts found.
+          ) : (
+            contacts.map((contact) => (
+              <TableRow key={contact.id}>
+                <TableCell className="font-medium">{contact.name}</TableCell>
+                <TableCell>{getTypeLabel(contact.type)}</TableCell>
+                <TableCell>{contact.relationship}</TableCell>
+                <TableCell>
+                  <div className="flex flex-col space-y-1">
+                    {contact.email && (
+                      <div className="flex items-center text-sm">
+                        <Mail className="mr-2 h-3 w-3 text-muted-foreground" />
+                        <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">
+                          {contact.email}
+                        </a>
+                      </div>
+                    )}
+                    {contact.phone && (
+                      <div className="flex items-center text-sm">
+                        <Phone className="mr-2 h-3 w-3 text-muted-foreground" />
+                        <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">
+                          {contact.phone}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <Link href={`/dashboard/resources/contacts/edit?id=${contact.id}`}>
+                        <DropdownMenuItem>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                      </Link>
+                      <DropdownMenuItem onClick={() => handleArchive(contact.id, !contact.isArchived)}>
+                        {contact.isArchived ? 'Unarchive' : 'Archive'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDelete(contact.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredContacts.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell className="font-medium">{contact.name}</TableCell>
-                  <TableCell>{getTypeLabel(contact.type)}</TableCell>
-                  <TableCell>{contact.relationship}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col space-y-1">
-                      {contact.email && (
-                        <div className="flex items-center text-sm">
-                          <Mail className="mr-2 h-3 w-3 text-muted-foreground" />
-                          <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">
-                            {contact.email}
-                          </a>
-                        </div>
-                      )}
-                      {contact.phone && (
-                        <div className="flex items-center text-sm">
-                          <Phone className="mr-2 h-3 w-3 text-muted-foreground" />
-                          <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">
-                            {contact.phone}
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <Link href={`/dashboard/resources/contacts/edit?id=${contact.id}`}>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                        </Link>
-                        <DropdownMenuItem onClick={() => handleArchive(contact.id, !contact.isArchived)}>
-                          {contact.isArchived ? 'Unarchive' : 'Archive'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(contact.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+            ))
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 } 

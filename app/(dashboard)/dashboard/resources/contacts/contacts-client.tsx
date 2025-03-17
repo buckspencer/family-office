@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, Table as TableIcon, Grid } from 'lucide-react';
 import { ContactsTable } from './contacts-table';
 import { Card, CardContent } from '@/components/ui/card';
+import { BackButton } from '@/components/ui/back-button';
 
 // Define the Contact type to match the one in contacts-table
 type Contact = {
@@ -124,6 +125,11 @@ export function ContactsClientPage({ initialContacts }: ContactsClientPageProps)
 
   return (
     <div className="container mx-auto p-6">
+      <BackButton 
+        href="/dashboard/resources" 
+        label="Back to Resources Dashboard"
+      />
+
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Contacts</h1>
