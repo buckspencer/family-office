@@ -1,15 +1,35 @@
-'use client';
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import EventsTable from './events-table';
-// @ts-ignore - Using temp-schema
-import { events } from '@/lib/db/temp-schema/events.types';
+import { getEvents } from '@/lib/db/actions/events';
 import { BackButton } from '@/components/ui/back-button';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
-export default function EventsPage() {
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export default async function EventsPage() {
+  const supabase = createServerComponentClient({ cookies });
+
+  // Check if user is authenticated
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/auth/signin');
+  }
+
+  // Get team ID (hardcoded to 1 for now, should be fetched from user's active team)
+  const teamId = 1;
+  
+  // Fetch events
+  const { success, data: events, error } = await getEvents(teamId, {
+    orderBy: 'startDate',
+    orderDir: 'desc',
+  });
+
   return (
     <div className="container mx-auto p-6">
       <BackButton 
@@ -32,7 +52,17 @@ export default function EventsPage() {
           <CardTitle>All Events</CardTitle>
         </CardHeader>
         <CardContent>
-          <EventsTable events={events} />
+          {error && (
+            <div className="text-red-500 mb-4">Error loading events: {error}</div>
+          )}
+          {success && events && (
+            <EventsTable events={events} />
+          )}
+          {success && (!events || events.length === 0) && (
+            <div className="text-center py-8 text-muted-foreground">
+              No events found. Create your first event to get started.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

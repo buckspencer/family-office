@@ -26,11 +26,30 @@ import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { createEvent } from '@/lib/db/actions/events';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { updateEvent } from '@/lib/db/actions/events';
+import { format } from 'date-fns';
 
-// Define event types
-type EventType = 'birthday' | 'anniversary' | 'holiday' | 'reminder' | 'other';
+// Define a more flexible Event type that works with the database schema
+interface Event {
+  id: number;
+  title: string;
+  type: 'birthday' | 'anniversary' | 'holiday' | 'reminder' | 'other';
+  description: string | null | undefined;
+  startDate: Date | string;
+  endDate?: Date | string | null;
+  location?: string | null;
+  notes?: string | null;
+  isRecurring?: boolean | null;
+  recurrenceRule?: string | null;
+  reminderBefore?: number | null;
+  isArchived?: boolean | null;
+  tags?: string[] | null;
+  metadata?: unknown;
+  teamId: number;
+  userId: string | number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
 
 const eventTypes = [
   { value: 'birthday', label: 'Birthday' },
@@ -53,50 +72,42 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function NewEventForm() {
+interface EditEventFormProps {
+  event: Event;
+}
+
+// Helper to format date to datetime-local input format
+function formatDateForInput(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  
+  return format(new Date(date), "yyyy-MM-dd'T'HH:mm");
+}
+
+export default function EditEventForm({ event }: EditEventFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [userId, setUserId] = React.useState<string | null>(null);
-  const supabase = createClientComponentClient();
 
-  // Get current user
-  React.useEffect(() => {
-    async function getUserId() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-      }
-    }
-    
-    getUserId();
-  }, [supabase]);
-
-  // Initialize react-hook-form
+  // Initialize react-hook-form with existing event data
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: '',
-      type: undefined,
-      description: '',
-      startDate: '',
-      endDate: '',
-      location: '',
-      notes: '',
+      title: event.title,
+      type: event.type,
+      description: event.description || '',
+      startDate: formatDateForInput(event.startDate),
+      endDate: formatDateForInput(event.endDate),
+      location: event.location || '',
+      notes: event.notes || '',
     },
   });
 
   const onSubmit = async (data: FormValues) => {
-    if (!userId) {
-      setError('User authentication failed. Please try again.');
-      return;
-    }
-    
     setIsSubmitting(true);
     setError(null);
     
     try {
-      const result = await createEvent({
+      const result = await updateEvent(event.id, {
         title: data.title,
         type: data.type,
         description: data.description || null,
@@ -104,17 +115,12 @@ export default function NewEventForm() {
         endDate: data.endDate ? new Date(data.endDate) : null,
         location: data.location || null,
         notes: data.notes || null,
-        // Required fields for the database
-        teamId: 1, // Hardcoded for now, should come from user's active team
-        userId: userId, // Using actual user UUID from session
-        isArchived: false,
-        isRecurring: false,
       });
       
       if (result.success) {
         router.push('/dashboard/resources/events');
       } else {
-        setError(result.error || 'Failed to create event');
+        setError(result.error || 'Failed to update event');
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -128,7 +134,7 @@ export default function NewEventForm() {
     <div className="container mx-auto p-6">
       <Card>
         <CardHeader>
-          <CardTitle>Add New Event</CardTitle>
+          <CardTitle>Edit Event</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -275,7 +281,7 @@ export default function NewEventForm() {
                   <Button variant="outline" type="button">Cancel</Button>
                 </Link>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Creating...' : 'Create Event'}
+                  {isSubmitting ? 'Updating...' : 'Update Event'}
                 </Button>
               </div>
             </form>
