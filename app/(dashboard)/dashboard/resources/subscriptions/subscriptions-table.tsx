@@ -18,8 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Search, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { deleteSubscription } from './actions';
 import { useRouter } from 'next/navigation';
@@ -31,15 +30,7 @@ interface SubscriptionsTableProps {
 
 export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableProps) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>(initialSubscriptions);
-  const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
-
-  // Filter subscriptions based on search term
-  const filteredSubscriptions = subscriptions.filter(subscription => 
-    subscription.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    subscription.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    subscription.category?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this subscription?')) {
@@ -74,20 +65,7 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center space-x-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search subscriptions..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
+    <div className="space-y-4 pt-3">
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -101,14 +79,14 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSubscriptions.length === 0 ? (
+            {subscriptions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
                   No subscriptions found.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredSubscriptions.map((subscription) => (
+              subscriptions.map((subscription) => (
                 <TableRow key={subscription.id}>
                   <TableCell className="font-medium">{subscription.name}</TableCell>
                   <TableCell className="capitalize">{subscription.type}</TableCell>
