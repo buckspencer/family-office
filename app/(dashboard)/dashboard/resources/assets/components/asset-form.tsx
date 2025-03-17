@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  description: z.string().optional(),
+  description: z.string().min(1, 'Description is required'),
   type: z.string().min(1, 'Type is required'),
   value: z.string().optional(),
   purchaseDate: z.string().optional(),
@@ -58,6 +58,12 @@ export default function AssetForm({ asset, mode }: AssetFormProps) {
       Object.entries(values).forEach(([key, value]) => {
         if (value !== undefined && value !== '') {
           formData.append(key, value);
+        } else if (key === 'description') {
+          // Ensure description is never empty
+          formData.append(key, value || '');
+        } else if (key === 'value') {
+          // Ensure value is never empty or NaN
+          formData.append(key, value || '0');
         }
       });
 
@@ -240,6 +246,17 @@ export default function AssetForm({ asset, mode }: AssetFormProps) {
               {isSubmitting ? `${mode === 'create' ? 'Creating' : 'Updating'}...` : `${mode === 'create' ? 'Create' : 'Update'} Asset`}
             </Button>
           </div>
+          
+          {mode === 'create' && (
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-md">
+              <p className="text-sm text-blue-700 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                After creating this asset, you'll be able to upload related files and documents from the asset details page.
+              </p>
+            </div>
+          )}
         </form>
       </Form>
     </div>

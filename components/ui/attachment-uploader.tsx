@@ -77,7 +77,7 @@ export function AttachmentUploader({
       }, 100);
       
       // Upload file to Supabase Storage
-      const { url, error } = await uploadFile(file, 'resources', resourceType, resourceId.toString());
+      const { url, error } = await uploadFile(file, 'resources', resourceType);
       
       if (error) {
         throw error;
@@ -136,12 +136,29 @@ export function AttachmentUploader({
         throw new Error(result.error);
       }
       
-      // Then delete from storage if we have the path
-      if (attachment.metadata && typeof attachment.metadata === 'object') {
-        const metadata = attachment.metadata as { storagePath?: string };
-        if (metadata.storagePath) {
-          await deleteFile(metadata.storagePath);
+      // Try to delete from storage
+      try {
+        // First check if we have the path in metadata
+        let storagePath = '';
+        if (attachment.metadata && typeof attachment.metadata === 'object') {
+          const metadata = attachment.metadata as { storagePath?: string };
+          if (metadata.storagePath) {
+            storagePath = metadata.storagePath;
+          }
         }
+        
+        // If no storage path in metadata, try to extract it from the fileUrl
+        if (!storagePath && attachment.fileUrl) {
+          // If it's a Supabase URL, extract the path
+          if (attachment.fileUrl.includes('supabase.co') || attachment.fileUrl.includes('storage/v1/object')) {
+            await deleteFile(attachment.fileUrl);
+          }
+        } else if (storagePath) {
+          await deleteFile(storagePath);
+        }
+      } catch (storageError) {
+        console.error('Error deleting file from storage:', storageError);
+        // Continue with UI update even if storage deletion fails
       }
       
       // Update local state
@@ -209,10 +226,12 @@ export function AttachmentUploader({
             <Card key={attachment.id} className="overflow-hidden">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    {getFileIcon(attachment.fileType)}
-                    <div>
-                      <p className="font-medium text-sm">{attachment.name}</p>
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="flex-shrink-0">
+                      {getFileIcon(attachment.fileType)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate" title={attachment.name}>{attachment.name}</p>
                       {attachment.fileSize && (
                         <p className="text-xs text-muted-foreground">
                           {formatFileSize(attachment.fileSize)}
@@ -220,7 +239,7 @@ export function AttachmentUploader({
                       )}
                     </div>
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 flex-shrink-0 ml-2">
                     <Button 
                       size="icon" 
                       variant="ghost" 

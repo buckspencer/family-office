@@ -130,45 +130,67 @@ export async function uploadFile(
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
     
     // Get the current user ID if not provided
-    if (!userId) {
+    let userIdToUse = userId;
+    if (!userIdToUse) {
       console.log('No userId provided, attempting to get current user');
-      const { data, error: authError } = await client.auth.getUser();
+      // First try to get the user from the session
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
       
-      if (authError) {
-        console.error('Error getting current user:', authError);
-        return { 
-          url: '', 
-          error: new Error(`Authentication error: ${authError.message}`) 
-        };
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+      } else if (sessionData?.session?.user) {
+        userIdToUse = sessionData.session.user.id;
+        console.log('Got user ID from session:', userIdToUse);
+      } else {
+        // If no session, try getUser as fallback
+        const { data, error: authError } = await client.auth.getUser();
+        
+        if (authError) {
+          console.error('Error getting current user:', authError);
+          return { 
+            url: '', 
+            error: new Error(`Authentication error: ${authError.message}`) 
+          };
+        }
+        
+        if (!data.user) {
+          console.error('No authenticated user found');
+          return { 
+            url: '', 
+            error: new Error('User ID is required for file upload but no authenticated user was found') 
+          };
+        }
+        
+        userIdToUse = data.user.id;
+        console.log('Got current user ID from getUser:', userIdToUse);
       }
-      
-      if (!data.user) {
-        console.error('No authenticated user found');
-        return { 
-          url: '', 
-          error: new Error('User ID is required for file upload but no authenticated user was found') 
-        };
-      }
-      
-      userId = data.user.id;
-      console.log('Got current user ID:', userId);
     }
     
-    // IMPORTANT: The folder structure must match the RLS policy
-    // The policy expects the first folder to be the user's ID
-    let filePath = `${userId}/`;
+    // Adjust the bucket and path based on the category
+    // If category is 'asset', use the resources bucket with asset folder
+    let actualBucket = bucket;
+    let filePath = '';
     
-    if (category) {
-      filePath += `${category}/`;
+    if (category === 'asset') {
+      actualBucket = 'resources';
+      filePath = `${userIdToUse}/asset/${fileName}`;
+    } else {
+      // IMPORTANT: The folder structure must match the RLS policy
+      // The policy expects the first folder to be the user's ID
+      filePath = `${userIdToUse}/`;
+      
+      if (category) {
+        filePath += `${category}/`;
+      }
+      
+      filePath += fileName;
     }
     
-    filePath += fileName;
-    
-    console.log('Attempting to upload file to:', { bucket, filePath, fileSize: file.size, fileType: file.type });
+    console.log('Attempting to upload file to:', { bucket: actualBucket, filePath, fileSize: file.size, fileType: file.type });
     
     // Upload the file to the specified bucket with upsert:true to overwrite if exists
     const { data, error } = await client.storage
-      .from(bucket)
+      .from(actualBucket)
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: true // Use upsert to overwrite existing files
@@ -176,21 +198,15 @@ export async function uploadFile(
     
     if (error) {
       console.error('Supabase storage upload error:', error);
-      
-      // Provide more specific error messages
-      if (error.message.includes('Permission denied') || error.message.includes('violates row-level security policy')) {
-        return { 
-          url: '', 
-          error: new Error(`Permission denied. The RLS policy requires files to be uploaded to your own folder (${userId}/). Error: ${error.message}`) 
-        };
-      }
-      
-      return { url: '', error: new Error(error.message) };
+      return { 
+        url: '', 
+        error: new Error(`Upload failed: ${error.message}`) 
+      };
     }
     
     // Get the public URL
     const { data: { publicUrl } } = client.storage
-      .from(bucket)
+      .from(actualBucket)
       .getPublicUrl(data.path);
     
     console.log('File uploaded successfully:', { path: data.path, publicUrl });
@@ -219,34 +235,33 @@ export async function deleteFile(
         bucket = pathParts[0];
         path = pathParts.slice(1).join('/');
       }
+    } else if (filePath.includes('supabase.co')) {
+      // Handle other Supabase URL formats
+      try {
+        const url = new URL(filePath);
+        const pathSegments = url.pathname.split('/');
+        
+        // Look for the bucket name in the path
+        const bucketIndex = pathSegments.findIndex(segment => 
+          segment === 'storage' || segment === 'object' || segment === 'public'
+        );
+        
+        if (bucketIndex >= 0 && bucketIndex + 1 < pathSegments.length) {
+          bucket = pathSegments[bucketIndex + 1];
+          path = pathSegments.slice(bucketIndex + 2).join('/');
+        }
+      } catch (urlError) {
+        console.warn('Could not parse URL:', urlError);
+        // Continue with the original path
+      }
     }
     
     console.log('Attempting to delete file:', { bucket, path });
     
-    // Try to get the parent folder path
-    const folderPath = path.split('/').slice(0, -1).join('/');
-    const fileName = path.split('/').pop() || '';
-    
-    // Check if the file exists before attempting to delete
-    try {
-      const { data: fileList, error: listError } = await supabase.storage
-        .from(bucket)
-        .list(folderPath);
-        
-      if (listError) {
-        console.error('Error listing files in folder:', listError);
-        // Continue with deletion attempt even if listing fails
-      } else {
-        const fileExists = fileList?.some(file => file.name === fileName);
-        
-        if (!fileExists) {
-          console.warn('File does not exist or cannot be found:', { bucket, path, folderPath, fileName });
-          // Continue with deletion attempt anyway
-        }
-      }
-    } catch (listError) {
-      console.error('Error checking if file exists:', listError);
-      // Continue with deletion attempt even if checking fails
+    // Check if the path is empty
+    if (!path) {
+      console.warn('Empty file path, cannot delete');
+      return { success: false, error: new Error('Empty file path') };
     }
     
     // Attempt to delete the file
@@ -256,7 +271,7 @@ export async function deleteFile(
 
     if (error) {
       console.error('Error deleting file from storage:', error);
-      throw error;
+      return { success: false, error: new Error(error.message) };
     }
 
     return { success: true, error: null };
