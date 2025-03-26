@@ -10,6 +10,11 @@ alwaysApply: false
 - [x] Basic Next.js configuration
 - [x] Database schema defined
 - [x] Project rules documented
+- [x] Email verification setup
+  - [x] Added Resend.com integration
+  - [x] Created email templates
+  - [x] Updated database schema
+  - [x] Generated migrations
 
 ## Next Steps
 1. [ ] Database Setup
@@ -19,6 +24,7 @@ alwaysApply: false
    - [ ] Set up seed data
 
 2. [ ] Authentication Implementation
+   - [x] Set up email service (Resend)
    - [ ] Set up JWT authentication
    - [ ] Implement login/signup flows
    - [ ] Add password reset functionality
