@@ -54,25 +54,25 @@ export async function GET(request: NextRequest) {
       throw new Error("No user ID found in session's client_reference_id.");
     }
 
-    const user = await db
+    const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.id, Number(userId)))
+      .where(eq(users.id, userId))
       .limit(1);
 
-    if (user.length === 0) {
+    if (!user) {
       throw new Error('User not found in database.');
     }
 
-    const userTeam = await db
+    const [userTeam] = await db
       .select({
         teamId: teamMembers.teamId,
       })
       .from(teamMembers)
-      .where(eq(teamMembers.userId, user[0].id))
+      .where(eq(teamMembers.userId, user.id))
       .limit(1);
 
-    if (userTeam.length === 0) {
+    if (!userTeam) {
       throw new Error('User is not associated with any team.');
     }
 
@@ -86,9 +86,9 @@ export async function GET(request: NextRequest) {
         subscriptionStatus: subscription.status,
         updatedAt: new Date(),
       })
-      .where(eq(teams.id, userTeam[0].teamId));
+      .where(eq(teams.id, userTeam.teamId));
 
-    await setSession(user[0]);
+    await setSession(user);
     return NextResponse.redirect(new URL('/dashboard', request.url));
   } catch (error) {
     console.error('Error handling successful checkout:', error);

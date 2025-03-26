@@ -1,4 +1,4 @@
-  'use server';
+'use server';
 
 import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
@@ -30,7 +30,7 @@ import { sendVerificationEmail, sendInvitationEmail } from '@/lib/email/service'
 
 async function logActivity(
   teamId: number | null | undefined,
-  userId: number,
+  userId: string,
   type: ActivityType,
   ipAddress?: string,
 ) {
@@ -229,12 +229,14 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   redirect('/verify-prompt');
 });
 
-export async function signOut() {
-  const user = (await getUser()) as User;
+export const signOut = async () => {
+  const user = await getUser();
+  if (!user) return;
+  
   const userWithTeam = await getUserWithTeam(user.id);
   await logActivity(userWithTeam?.teamId, user.id, ActivityType.SIGN_OUT);
   (await cookies()).delete('session');
-}
+};
 
 const updatePasswordSchema = z
   .object({
