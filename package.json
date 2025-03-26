@@ -19,6 +19,8 @@
     "@radix-ui/react-scroll-area": "^1.2.3",
     "@radix-ui/react-separator": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.2",
+    "@react-email/components": "^0.0.34",
+    "@react-email/render": "^1.0.5",
     "@tailwindcss/postcss": "4.0.12",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.13.9",
@@ -29,7 +31,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.7",
-    "drizzle-kit": "^0.30.5",
     "drizzle-orm": "^0.40.0",
     "jose": "^6.0.8",
     "lucide-react": "^0.479.0",
@@ -38,6 +39,8 @@
     "postgres": "^3.4.5",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-email": "^3.0.7",
+    "resend": "^4.2.0",
     "server-only": "^0.0.1",
     "stripe": "^17.7.0",
     "tailwind-merge": "^3.0.2",
@@ -46,5 +49,9 @@
     "tailwindcss-react-aria-components": "2.0.0",
     "typescript": "^5.8.2",
     "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.30.5",
+    "prettier": "^3.4.2"
   }
 }

@@ -1,14 +1,14 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Settings,
-  LogOut,
   UserPlus,
-  Lock,
   UserCog,
-  AlertCircle,
-  UserMinus,
+  LogOut,
+  Settings,
   Mail,
-  CheckCircle,
+  UserMinus,
+  Users,
+  UserCheck,
+  Lock,
+  AlertCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { ActivityType } from '@/lib/db/schema';
@@ -21,10 +21,11 @@ const iconMap: Record<ActivityType, LucideIcon> = {
   [ActivityType.UPDATE_PASSWORD]: Lock,
   [ActivityType.DELETE_ACCOUNT]: UserMinus,
   [ActivityType.UPDATE_ACCOUNT]: Settings,
-  [ActivityType.CREATE_TEAM]: UserPlus,
+  [ActivityType.CREATE_TEAM]: Users,
   [ActivityType.REMOVE_TEAM_MEMBER]: UserMinus,
   [ActivityType.INVITE_TEAM_MEMBER]: Mail,
-  [ActivityType.ACCEPT_INVITATION]: CheckCircle,
+  [ActivityType.ACCEPT_INVITATION]: UserCheck,
+  [ActivityType.VERIFY_EMAIL]: Mail,
 };
 
 function getRelativeTime(date: Date) {
@@ -63,6 +64,8 @@ function formatAction(action: ActivityType): string {
       return 'You invited a team member';
     case ActivityType.ACCEPT_INVITATION:
       return 'You accepted an invitation';
+    case ActivityType.VERIFY_EMAIL:
+      return 'You verified your email';
     default:
       return 'Unknown action occurred';
   }
@@ -72,55 +75,37 @@ export default async function ActivityPage() {
   const logs = await getActivityLogs();
 
   return (
-    <section className="flex-1 p-4 lg:p-8">
-      <h1 className="text-lg lg:text-2xl font-medium text-gray-900 mb-6">
-        Activity Log
-      </h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {logs.length > 0 ? (
-            <ul className="space-y-4">
-              {logs.map((log) => {
-                const Icon = iconMap[log.action as ActivityType] || Settings;
-                const formattedAction = formatAction(
-                  log.action as ActivityType
-                );
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Activity</h2>
+        <p className="text-muted-foreground">
+          View all activity on your account.
+        </p>
+      </div>
 
-                return (
-                  <li key={log.id} className="flex items-center space-x-4">
-                    <div className="bg-orange-100 rounded-full p-2">
-                      <Icon className="w-5 h-5 text-orange-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {formattedAction}
-                        {log.ipAddress && ` from IP ${log.ipAddress}`}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {getRelativeTime(new Date(log.timestamp))}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center py-12">
-              <AlertCircle className="h-12 w-12 text-orange-500 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No activity yet
-              </h3>
-              <p className="text-sm text-gray-500 max-w-sm">
-                When you perform actions like signing in or updating your
-                account, they'll appear here.
-              </p>
+      <div className="space-y-4">
+        {logs.map((log) => {
+          // Safely get the icon component, fallback to AlertCircle if not found
+          const Icon = log.action in iconMap ? iconMap[log.action as ActivityType] : AlertCircle;
+          
+          return (
+            <div
+              key={log.id}
+              className="flex items-center gap-4 rounded-lg border p-4"
+            >
+              <Icon className="h-5 w-5 text-gray-500" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium leading-none">
+                  {formatAction(log.action as ActivityType)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(log.timestamp).toLocaleString()}
+                </p>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </section>
+          );
+        })}
+      </div>
+    </div>
   );
 }

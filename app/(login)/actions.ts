@@ -1,4 +1,4 @@
-'use server';
+  'use server';
 
 import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
@@ -25,6 +25,8 @@ import {
   validatedAction,
   validatedActionWithUser,
 } from '@/lib/auth/middleware';
+import { generateVerificationToken, generateTokenExpiry } from '@/lib/auth/tokens';
+import { sendVerificationEmail, sendInvitationEmail } from '@/lib/email/service';
 
 async function logActivity(
   teamId: number | null | undefined,
@@ -124,11 +126,16 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   }
 
   const passwordHash = await hashPassword(password);
+  const verificationToken = generateVerificationToken();
+  const verificationTokenExpiry = generateTokenExpiry();
 
   const newUser: NewUser = {
     email,
     passwordHash,
     role: 'owner', // Default role, will be overridden if there's an invitation
+    emailVerified: false,
+    verificationToken,
+    verificationTokenExpiry,
   };
 
   const [createdUser] = await db.insert(users).values(newUser).returning();
@@ -140,6 +147,12 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
       password,
     };
   }
+
+  // Send verification email
+  await sendVerificationEmail({
+    email,
+    token: verificationToken,
+  });
 
   let teamId: number;
   let userRole: string;
@@ -212,13 +225,8 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     setSession(createdUser),
   ]);
 
-  const redirectTo = formData.get('redirect') as string | null;
-  if (redirectTo === 'checkout') {
-    const priceId = formData.get('priceId') as string;
-    return createCheckoutSession({ team: createdTeam, priceId });
-  }
-
-  redirect('/dashboard');
+  // Instead of redirecting to dashboard, redirect to verify-prompt
+  redirect('/verify-prompt');
 });
 
 export async function signOut() {
@@ -423,23 +431,82 @@ export const inviteTeamMember = validatedActionWithUser(
     }
 
     // Create a new invitation
-    await db.insert(invitations).values({
-      teamId: userWithTeam.teamId,
-      email,
-      role,
-      invitedBy: user.id,
-      status: 'pending',
-    });
+    const [invitation] = await db
+      .insert(invitations)
+      .values({
+        teamId: userWithTeam.teamId,
+        email,
+        role,
+        invitedBy: user.id,
+        status: 'pending',
+      })
+      .returning();
 
-    await logActivity(
-      userWithTeam.teamId,
-      user.id,
-      ActivityType.INVITE_TEAM_MEMBER,
-    );
+    if (!userWithTeam.team) {
+      return { error: 'Team not found' };
+    }
 
-    // TODO: Send invitation email and include ?inviteId={id} to sign-up URL
-    // await sendInvitationEmail(email, userWithTeam.team.name, role)
+    await Promise.all([
+      sendInvitationEmail({
+        email,
+        teamName: userWithTeam.team.name,
+        inviterName: user.name || user.email,
+        role,
+        invitationId: invitation.id,
+      }),
+      logActivity(
+        userWithTeam.teamId,
+        user.id,
+        ActivityType.INVITE_TEAM_MEMBER,
+      ),
+    ]);
 
     return { success: 'Invitation sent successfully' };
   },
 );
+
+const verifyEmailSchema = z.object({
+  token: z.string(),
+});
+
+export const verifyEmail = validatedAction(verifyEmailSchema, async (data) => {
+  const { token } = data;
+
+  // Find user with matching verification token
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.verificationToken, token))
+    .limit(1);
+
+  if (!user) {
+    console.log('No user found with token:', token);
+    redirect('/sign-in?error=invalid-token');
+  }
+
+  console.log('Found user:', user.email);
+
+  // Check if token is expired
+  if (
+    user.verificationTokenExpiry &&
+    new Date(user.verificationTokenExpiry) < new Date()
+  ) {
+    console.log('Token expired for user:', user.email);
+    redirect('/verify-prompt?error=token-expired');
+  }
+
+  // Update user as verified
+  await db
+    .update(users)
+    .set({
+      emailVerified: true,
+      verificationToken: null,
+      verificationTokenExpiry: null,
+    })
+    .where(eq(users.id, user.id));
+
+  console.log('User verified successfully:', user.email);
+
+  // Redirect to dashboard
+  redirect('/dashboard');
+});
