@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1726443359662,
-      "tag": "0000_soft_the_anarchist",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1743015097207,
-      "tag": "0001_cooing_black_bird",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1743038166654,
-      "tag": "0002_slippery_wasp",
+      "when": 1743094344749,
+      "tag": "0000_yielding_trish_tilby",
       "breakpoints": true
     }
   ]

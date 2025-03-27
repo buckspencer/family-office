@@ -34,6 +34,7 @@ export const sendVerificationEmail = async ({
       to: email,
       subject: 'Verify your email address',
       html: emailHtml,
+      replyTo: 'support@phronemalabs.com'
     });
 
     console.log('Email sent successfully:', data);
@@ -41,7 +42,25 @@ export const sendVerificationEmail = async ({
   } catch (error) {
     console.error('Failed to send verification email:', error);
     console.error('Error details:', JSON.stringify(error, null, 2));
-    return { success: false, error };
+    
+    // Return a more specific error message
+    if (error instanceof Error) {
+      return { 
+        success: false, 
+        error: {
+          message: error.message,
+          name: error.name
+        }
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: {
+        message: 'Failed to send verification email',
+        name: 'UnknownError'
+      }
+    };
   }
 };
 
@@ -76,6 +95,7 @@ export const sendInvitationEmail = async ({
       to: email,
       subject: `Join ${teamName} on Family Office`,
       html: emailHtml,
+      replyTo: 'support@phronemalabs.com'
     });
 
     console.log('Invitation email sent successfully:', data);
@@ -83,6 +103,24 @@ export const sendInvitationEmail = async ({
   } catch (error) {
     console.error('Failed to send invitation email:', error);
     console.error('Error details:', JSON.stringify(error, null, 2));
-    return { success: false, error };
+    
+    // Return a more specific error message
+    if (error instanceof Error) {
+      return { 
+        success: false, 
+        error: {
+          message: error.message,
+          name: error.name
+        }
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: {
+        message: 'Failed to send invitation email',
+        name: 'UnknownError'
+      }
+    };
   }
 }; 
