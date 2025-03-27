@@ -467,48 +467,43 @@ export const inviteTeamMember = validatedActionWithUser(
   },
 );
 
-const verifyEmailSchema = z.object({
-  token: z.string(),
-});
+export const verifyEmail = validatedAction(
+  z.object({
+    token: z.string(),
+  }),
+  async (data) => {
+    const { token } = data;
 
-export const verifyEmail = validatedAction(verifyEmailSchema, async (data) => {
-  const { token } = data;
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.verificationToken, token),
+          sql`${users.verificationTokenExpiry} > NOW()`,
+        ),
+      )
+      .limit(1);
 
-  // Find user with matching verification token
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.verificationToken, token))
-    .limit(1);
+    if (!user) {
+      return {
+        error: 'Invalid or expired verification token.',
+      };
+    }
 
-  if (!user) {
-    console.log('No user found with token:', token);
-    redirect('/sign-in?error=invalid-token');
-  }
+    await db
+      .update(users)
+      .set({
+        emailVerified: true,
+        verificationToken: null,
+        verificationTokenExpiry: null,
+      })
+      .where(eq(users.id, user.id));
 
-  console.log('Found user:', user.email);
+    await logActivity(null, user.id, ActivityType.VERIFY_EMAIL);
 
-  // Check if token is expired
-  if (
-    user.verificationTokenExpiry &&
-    new Date(user.verificationTokenExpiry) < new Date()
-  ) {
-    console.log('Token expired for user:', user.email);
-    redirect('/verify-prompt?error=token-expired');
-  }
-
-  // Update user as verified
-  await db
-    .update(users)
-    .set({
-      emailVerified: true,
-      verificationToken: null,
-      verificationTokenExpiry: null,
-    })
-    .where(eq(users.id, user.id));
-
-  console.log('User verified successfully:', user.email);
-
-  // Redirect to dashboard
-  redirect('/dashboard');
-});
+    return {
+      success: 'Email verified successfully.',
+    };
+  },
+);

@@ -13,12 +13,19 @@ export default async function VerifyEmailPage({
 }) {
   const params = await searchParams;
   const token = params.token;
+  
   if (!token || Array.isArray(token)) {
     redirect('/sign-in');
   }
 
   const formData = new FormData();
-  formData.append('token', token);
-  await verifyEmail({ error: '', success: '' }, formData);
-  return null;
+  const result = await verifyEmail({ token }, formData);
+
+  if (result.error) {
+    // If verification failed, redirect to sign in
+    redirect('/sign-in');
+  }
+
+  // If verification succeeded, redirect to dashboard
+  redirect('/dashboard');
 } 

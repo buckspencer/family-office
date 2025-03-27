@@ -15,6 +15,13 @@
       "when": 1743015097207,
       "tag": "0001_cooing_black_bird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1743038166654,
+      "tag": "0002_slippery_wasp",
+      "breakpoints": true
     }
   ]
 }
