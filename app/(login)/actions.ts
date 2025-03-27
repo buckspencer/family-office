@@ -474,6 +474,8 @@ export const verifyEmail = validatedAction(
   async (data) => {
     const { token } = data;
 
+    console.log('Verifying email with token:', token);
+
     const [user] = await db
       .select()
       .from(users)
@@ -485,12 +487,16 @@ export const verifyEmail = validatedAction(
       )
       .limit(1);
 
+    console.log('Found user:', user);
+
     if (!user) {
+      console.log('No user found with token');
       return {
         error: 'Invalid or expired verification token.',
       };
     }
 
+    console.log('Updating user verification status');
     await db
       .update(users)
       .set({
@@ -500,10 +506,7 @@ export const verifyEmail = validatedAction(
       })
       .where(eq(users.id, user.id));
 
-    await logActivity(null, user.id, ActivityType.VERIFY_EMAIL);
-
-    return {
-      success: 'Email verified successfully.',
-    };
+    console.log('User verification completed');
+    return { success: true };
   },
 );

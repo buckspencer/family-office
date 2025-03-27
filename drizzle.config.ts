@@ -2,8 +2,8 @@ import type { Config } from 'drizzle-kit';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-if (!process.env.POSTGRES_URL) {
-  throw new Error('POSTGRES_URL is not set');
+if (!process.env.POSTGRES_URL_NON_POOLING) {
+  throw new Error('POSTGRES_URL_NON_POOLING is not set');
 }
 
 export default {
@@ -11,7 +11,7 @@ export default {
   out: './lib/db/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.POSTGRES_URL,
+    url: process.env.POSTGRES_URL_NON_POOLING,
   },
   verbose: true,
   strict: true,
