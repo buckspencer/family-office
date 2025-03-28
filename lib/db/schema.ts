@@ -121,19 +121,16 @@ export const familySubscriptions = pgTable('family_subscriptions', {
 });
 
 export const familyAIChats = pgTable('family_ai_chats', {
-  id: serial('id').primaryKey(),
-  teamId: integer('team_id')
-    .notNull()
-    .references(() => teams.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+  id: uuid('id').defaultRandom().primaryKey(),
+  teamId: uuid('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   message: text('message').notNull(),
-  role: varchar('role', { length: 20 }).notNull(), // 'user' or 'assistant'
-  timestamp: timestamp('timestamp').notNull().defaultNow(),
-  action: jsonb('action'), // Structured action data
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  response: text('response'),
+  role: text('role').notNull(),
+  action: jsonb('action'),
+  status: text('status').default('pending'),
+  error: text('error'),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
 });
 
