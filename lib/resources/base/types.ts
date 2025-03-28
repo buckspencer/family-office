@@ -49,8 +49,10 @@ export type ResourceAction = {
     endDate?: string;
     location?: string;
     attendees?: string[];
+    requiresConfirmation?: boolean;
   };
   error?: string;
+  requiresConfirmation?: boolean;
 };
 
 // AI response type

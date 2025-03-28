@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
 
       // Check email verification status for protected routes
       if (isProtectedRoute && !parsed.user.emailVerified) {
-        return NextResponse.redirect(new URL('/verify-prompt', request.url));
+        return NextResponse.redirect(new URL('/verify-email', request.url));
       }
 
       res.cookies.set({

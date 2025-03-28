@@ -5,6 +5,7 @@ import { users } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { sendVerificationEmail } from '@/lib/email/service';
 import { redirect } from 'next/navigation';
+import { Metadata } from 'next';
 
 async function resendVerification() {
   'use server';
@@ -59,6 +60,10 @@ async function resendVerification() {
     token: verificationToken,
   });
 }
+
+export const metadata: Metadata = {
+  title: 'Verify Email',
+};
 
 export default async function VerifyPromptPage() {
   const user = await getUser();

@@ -20,13 +20,28 @@ export const taskPriorityEnum = pgEnum('task_priority', ['low', 'medium', 'high'
 export const documentStatusEnum = pgEnum('document_status', ['draft', 'active', 'archived', 'deleted']);
 export const eventStatusEnum = pgEnum('event_status', ['scheduled', 'in_progress', 'completed', 'cancelled']);
 export const userRoleEnum = pgEnum('user_role', ['owner', 'admin', 'member', 'guest']);
+export const activityTypeEnum = pgEnum('activity_type', [
+  'SIGN_IN',
+  'SIGN_OUT',
+  'SIGN_UP',
+  'CREATE_TEAM',
+  'ACCEPT_INVITATION',
+  'UPDATE_PROFILE',
+  'UPDATE_PASSWORD',
+  'VERIFY_EMAIL',
+  'RESET_PASSWORD',
+  'DELETE_ACCOUNT',
+  'REMOVE_TEAM_MEMBER',
+  'INVITE_TEAM_MEMBER',
+  'UPDATE_ACCOUNT'
+]);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 100 }),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  role: userRoleEnum('role').notNull().default('member'),
+  role: text('role').notNull().default('member'),
   emailVerified: boolean('email_verified').notNull().default(false),
   verificationToken: text('verification_token'),
   verificationTokenExpiry: timestamp('verification_token_expiry'),
@@ -62,7 +77,7 @@ export const teamMembers = pgTable('team_members', {
   teamId: integer('team_id')
     .notNull()
     .references(() => teams.id, { onDelete: 'cascade' }),
-  role: userRoleEnum('role').notNull(),
+  role: text('role').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
@@ -90,7 +105,7 @@ export const invitations = pgTable('invitations', {
     .notNull()
     .references(() => teams.id, { onDelete: 'cascade' }),
   email: varchar('email', { length: 255 }).notNull(),
-  role: userRoleEnum('role').notNull(),
+  role: text('role').notNull(),
   invitedBy: uuid('invited_by')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
@@ -121,8 +136,8 @@ export const familySubscriptions = pgTable('family_subscriptions', {
 });
 
 export const familyAIChats = pgTable('family_ai_chats', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  teamId: uuid('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   message: text('message').notNull(),
   response: text('response'),
@@ -198,13 +213,12 @@ export const familyTasks = pgTable('family_tasks', {
     .references(() => teams.id, { onDelete: 'cascade' }),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
+  status: text('status').notNull().default('pending'),
+  priority: text('priority').notNull().default('medium'),
   dueDate: timestamp('due_date'),
-  priority: taskPriorityEnum('priority'),
-  category: varchar('category', { length: 50 }),
   assignedTo: uuid('assigned_to')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  status: taskStatusEnum('status').notNull().default('pending'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
@@ -220,10 +234,8 @@ export const familyDocuments = pgTable('family_documents', {
     .notNull()
     .references(() => teams.id, { onDelete: 'cascade' }),
   title: varchar('title', { length: 255 }).notNull(),
-  type: varchar('type', { length: 50 }).notNull(),
   content: text('content'),
-  tags: text('tags').array(),
-  status: documentStatusEnum('status').notNull().default('draft'),
+  status: text('status').notNull().default('draft'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
@@ -239,12 +251,10 @@ export const familyEvents = pgTable('family_events', {
     .notNull()
     .references(() => teams.id, { onDelete: 'cascade' }),
   title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date').notNull(),
-  description: text('description'),
-  location: text('location'),
-  attendees: text('attendees').array(),
-  status: eventStatusEnum('status').notNull().default('scheduled'),
+  status: text('status').notNull().default('scheduled'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
@@ -307,3 +317,6 @@ export type FamilySubscription = typeof familySubscriptions.$inferSelect;
 export type NewFamilySubscription = typeof familySubscriptions.$inferInsert;
 export type FamilyAIChat = typeof familyAIChats.$inferSelect;
 export type NewFamilyAIChat = typeof familyAIChats.$inferInsert;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type NewActivityLog = typeof activityLogs.$inferInsert;
+export type ActivityType = typeof activityTypeEnum.enumValues[number];

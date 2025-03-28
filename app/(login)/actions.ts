@@ -13,8 +13,10 @@ import {
   type NewTeam,
   type NewTeamMember,
   type NewActivityLog,
-  ActivityType,
+  activityTypeEnum,
   invitations,
+  userRoleEnum,
+  type ActivityType,
 } from '@/lib/db/schema';
 import { comparePasswords, hashPassword, setSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
@@ -31,7 +33,7 @@ import { sendVerificationEmail, sendInvitationEmail } from '@/lib/email/service'
 async function logActivity(
   teamId: number | null | undefined,
   userId: string,
-  type: ActivityType,
+  type: typeof activityTypeEnum.enumValues[number],
   ipAddress?: string,
 ) {
   if (teamId === null || teamId === undefined) {
@@ -90,7 +92,7 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
 
   await Promise.all([
     setSession(foundUser),
-    logActivity(foundTeam?.id, foundUser.id, ActivityType.SIGN_IN),
+    logActivity(foundTeam?.id, foundUser.id, 'SIGN_IN'),
   ]);
 
   const redirectTo = formData.get('redirect') as string | null;
@@ -181,7 +183,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
         .set({ status: 'accepted' })
         .where(eq(invitations.id, invitation.id));
 
-      await logActivity(teamId, createdUser.id, ActivityType.ACCEPT_INVITATION);
+      await logActivity(teamId, createdUser.id, 'ACCEPT_INVITATION');
 
       [createdTeam] = await db
         .select()
@@ -195,6 +197,8 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     // Create a new team if there's no invitation
     const newTeam: NewTeam = {
       name: `${email}'s Team`,
+      createdBy: createdUser.id,
+      updatedBy: createdUser.id,
     };
 
     [createdTeam] = await db.insert(teams).values(newTeam).returning();
@@ -210,18 +214,20 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     teamId = createdTeam.id;
     userRole = 'owner';
 
-    await logActivity(teamId, createdUser.id, ActivityType.CREATE_TEAM);
+    await logActivity(teamId, createdUser.id, 'CREATE_TEAM');
   }
 
   const newTeamMember: NewTeamMember = {
     userId: createdUser.id,
     teamId: teamId,
-    role: userRole,
+    role: userRole as typeof userRoleEnum.enumValues[number],
+    createdBy: createdUser.id,
+    updatedBy: createdUser.id,
   };
 
   await Promise.all([
     db.insert(teamMembers).values(newTeamMember),
-    logActivity(teamId, createdUser.id, ActivityType.SIGN_UP),
+    logActivity(teamId, createdUser.id, 'SIGN_UP'),
     setSession(createdUser),
   ]);
 
@@ -234,7 +240,7 @@ export const signOut = async () => {
   if (!user) return;
   
   const userWithTeam = await getUserWithTeam(user.id);
-  await logActivity(userWithTeam?.teamId, user.id, ActivityType.SIGN_OUT);
+  await logActivity(userWithTeam?.teamId, user.id, 'SIGN_OUT');
   (await cookies()).delete('session');
 };
 
@@ -277,7 +283,7 @@ export const updatePassword = validatedActionWithUser(
         .update(users)
         .set({ passwordHash: newPasswordHash })
         .where(eq(users.id, user.id)),
-      logActivity(userWithTeam?.teamId, user.id, ActivityType.UPDATE_PASSWORD),
+      logActivity(userWithTeam?.teamId, user.id, 'UPDATE_PASSWORD'),
     ]);
 
     return { success: 'Password updated successfully.' };
@@ -303,7 +309,7 @@ export const deleteAccount = validatedActionWithUser(
     await logActivity(
       userWithTeam?.teamId,
       user.id,
-      ActivityType.DELETE_ACCOUNT,
+      'DELETE_ACCOUNT',
     );
 
     // Soft delete
@@ -344,7 +350,7 @@ export const updateAccount = validatedActionWithUser(
 
     await Promise.all([
       db.update(users).set({ name, email }).where(eq(users.id, user.id)),
-      logActivity(userWithTeam?.teamId, user.id, ActivityType.UPDATE_ACCOUNT),
+      logActivity(userWithTeam?.teamId, user.id, 'UPDATE_PROFILE'),
     ]);
 
     return { success: 'Account updated successfully.' };
@@ -377,7 +383,7 @@ export const removeTeamMember = validatedActionWithUser(
     await logActivity(
       userWithTeam.teamId,
       user.id,
-      ActivityType.REMOVE_TEAM_MEMBER,
+      'REMOVE_TEAM_MEMBER',
     );
 
     return { success: 'Team member removed successfully' };
@@ -438,11 +444,16 @@ export const inviteTeamMember = validatedActionWithUser(
       .values({
         teamId: userWithTeam.teamId,
         email,
-        role,
+        role: role as typeof userRoleEnum.enumValues[number],
         invitedBy: user.id,
         status: 'pending',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
       })
       .returning();
+
+    if (!invitation) {
+      return { error: 'Failed to create invitation' };
+    }
 
     if (!userWithTeam.team) {
       return { error: 'Team not found' };
@@ -459,7 +470,7 @@ export const inviteTeamMember = validatedActionWithUser(
       logActivity(
         userWithTeam.teamId,
         user.id,
-        ActivityType.INVITE_TEAM_MEMBER,
+        'INVITE_TEAM_MEMBER',
       ),
     ]);
 
@@ -507,6 +518,7 @@ export const verifyEmail = validatedAction(
       .where(eq(users.id, user.id));
 
     console.log('User verification completed');
+    redirect('/dashboard');
     return { success: true };
   },
 );
