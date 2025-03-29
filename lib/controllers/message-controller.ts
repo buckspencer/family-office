@@ -1,5 +1,7 @@
-import { ChatMessage, Task } from '@/lib/types/chat';
-import { sendMessage, createTask } from '@/app/(dashboard)/dashboard/actions';
+import { ChatMessage, Task, ChatAction } from '@/lib/types/chat';
+import { sendMessage } from '@/app/(dashboard)/dashboard/actions';
+import { createTask } from '@/lib/ai/actions';
+import { AIResponse, ResourceAction } from '@/lib/resources/base/types';
 
 export type MessageState = {
   messages: ChatMessage[];
@@ -24,6 +26,13 @@ export class MessageController {
     this.state = { ...this.state, ...updates };
   }
 
+  private convertResourceActionToChatAction(action: ResourceAction): ChatAction {
+    return {
+      type: action.type === 'create_task' ? 'create_task' : 'ignore',
+      data: action.data
+    };
+  }
+
   async processMessage(content: string): Promise<{ success: boolean; error?: Error }> {
     this.updateState({ isLoading: true, error: null });
 
@@ -40,36 +49,50 @@ export class MessageController {
       const response = await sendMessage(this.teamId, content);
       console.log('MessageController - AI Response:', response);
       
-      if (response.success) {
+      if ('message' in response) {
         const aiMessage: ChatMessage = {
           role: 'assistant',
           content: response.message,
           timestamp: new Date(),
-          action: response.action
+          action: response.action ? this.convertResourceActionToChatAction(response.action) : undefined
         };
         this.state.messages.push(aiMessage);
 
-        // Handle task creation if needed
-        if (response.action?.type === 'create_task') {
-          const taskData = response.action.data as Task;
-          console.log('MessageController - Creating task:', taskData);
-          const result = await createTask(this.teamId, taskData);
-          
-          if (!result.success) {
-            throw new Error(result.error || 'Failed to create task');
+        // Handle any actions
+        if (response.action?.type === 'create_task' && response.action.data) {
+          const taskData = {
+            title: response.action.data.title || 'New Task',
+            description: response.action.data.description,
+            teamId: this.teamId
+          };
+          const result = await createTask(taskData, this.teamId.toString());
+          if (result) {
+            const taskMessage: ChatMessage = {
+              role: 'system',
+              content: `Task created: ${taskData.title}`,
+              timestamp: new Date()
+            };
+            this.state.messages.push(taskMessage);
           }
         }
+      } else if (response.success && response.chatEntry) {
+        const aiMessage: ChatMessage = {
+          role: 'assistant',
+          content: response.chatEntry.message,
+          timestamp: response.chatEntry.timestamp,
+          action: response.chatEntry.action ? this.convertResourceActionToChatAction(response.chatEntry.action as ResourceAction) : undefined
+        };
+        this.state.messages.push(aiMessage);
       }
 
+      this.updateState({ isLoading: false });
       return { success: true };
     } catch (error) {
-      console.error('MessageController - Message processing error:', error);
       this.updateState({ 
-        error: error instanceof Error ? error.message : 'Failed to process message' 
+        isLoading: false, 
+        error: error instanceof Error ? error.message : 'An error occurred' 
       });
-      return { success: false, error: error instanceof Error ? error : new Error('Failed to process message') };
-    } finally {
-      this.updateState({ isLoading: false });
+      return { success: false, error: error instanceof Error ? error : new Error('An error occurred') };
     }
   }
 

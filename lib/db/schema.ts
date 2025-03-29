@@ -48,8 +48,8 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
-  createdBy: uuid('created_by').references(() => users.id),
-  updatedBy: uuid('updated_by').references(() => users.id),
+  createdBy: uuid('created_by').references((): any => users.id),
+  updatedBy: uuid('updated_by').references((): any => users.id),
 });
 
 export const teams = pgTable('teams', {
@@ -264,6 +264,23 @@ export const familyEvents = pgTable('family_events', {
   updatedBy: uuid('updated_by').references(() => users.id),
 });
 
+export const actionLogs = pgTable('action_logs', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id')
+    .notNull()
+    .references(() => teams.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  actionType: varchar('action_type', { length: 50 }).notNull(),
+  actionData: jsonb('action_data').notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  executedAt: timestamp('executed_at'),
+  error: text('error'),
+  metadata: jsonb('metadata')
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   teamMembers: many(teamMembers),
@@ -294,6 +311,17 @@ export const teamsRelations = relations(teams, ({ many }) => ({
   updatedBy: many(users, { relationName: 'updatedTeams' }),
 }));
 
+export const actionLogsRelations = relations(actionLogs, ({ one }) => ({
+  team: one(teams, {
+    fields: [actionLogs.teamId],
+    references: [teams.id]
+  }),
+  user: one(users, {
+    fields: [actionLogs.userId],
+    references: [users.id]
+  })
+}));
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -320,3 +348,11 @@ export type NewFamilyAIChat = typeof familyAIChats.$inferInsert;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type NewActivityLog = typeof activityLogs.$inferInsert;
 export type ActivityType = typeof activityTypeEnum.enumValues[number];
+export type ActionLog = typeof actionLogs.$inferSelect;
+export type NewActionLog = typeof actionLogs.$inferInsert;
+
+export type TeamDataWithMembers = Team & {
+  teamMembers: (TeamMember & {
+    user: Pick<User, 'id' | 'name' | 'email'>;
+  })[];
+};

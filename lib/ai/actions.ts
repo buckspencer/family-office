@@ -70,22 +70,64 @@ export async function executeAction(action: ResourceAction) {
     }
 
     switch (action.type) {
+      case 'preview_task':
+      case 'preview_document':
+      case 'preview_subscription':
+      case 'preview_event':
+        // Preview actions don't need to do anything
+        return { status: 'preview', data: action.data };
+        
       case 'create_task':
-        return await createTask(action.data, session.user.id);
+        if (!action.data.title) {
+          throw new Error('Task title is required');
+        }
+        return await createTask({
+          title: action.data.title,
+          description: action.data.description,
+          teamId: action.data.teamId
+        }, session.user.id);
+        
       case 'create_document':
+        if (!action.data.title) {
+          throw new Error('Document title is required');
+        }
         return await createDocument(action.data, session.user.id);
+        
       case 'create_subscription':
+        if (!action.data.name) {
+          throw new Error('Subscription name is required');
+        }
         return await createSubscription(action.data, session.user.id);
+        
       case 'create_event':
+        if (!action.data.title) {
+          throw new Error('Event title is required');
+        }
         return await createEvent(action.data, session.user.id);
+        
       case 'execute_sql':
-        return await executeSQL(action.data.query, action.data.params);
+        if (!action.data.query) {
+          throw new Error('SQL query is required');
+        }
+        return await executeSQL(action.data.query, (action.data.params || []).map(String));
+        
       case 'execute_stored_procedure':
-        return await executeStoredProcedure(action.data.procedureName, action.data.params);
+        if (!action.data.procedureName) {
+          throw new Error('Stored procedure name is required');
+        }
+        return await executeStoredProcedure(action.data.procedureName, (action.data.params || []).map(String));
+        
       case 'execute_graphql':
-        return await executeGraphQL(action.data.query, action.data.variables);
+        if (!action.data.query) {
+          throw new Error('GraphQL query is required');
+        }
+        return await executeGraphQL(action.data.query, action.data.variables || {});
+        
       case 'error':
         throw new Error(action.error);
+        
+      default:
+        throw new Error('Invalid action type');
     }
   } catch (error) {
     console.error('Error executing action:', error);
@@ -93,27 +135,21 @@ export async function executeAction(action: ResourceAction) {
   }
 }
 
-async function createTask(data: any, userId: string) {
-  const validatedData = TaskDataSchema.parse({
-    ...data,
+export async function createTask(data: { title: string; description?: string; teamId?: number }, userId: string) {
+  const newTask: NewFamilyTask = {
+    title: data.title,
+    description: data.description || null,
+    status: 'pending',
+    priority: 'medium',
+    assignedTo: userId,
+    teamId: data.teamId || 1,
     createdBy: userId,
-    updatedBy: userId
-  });
-
-  const taskData = {
-    title: validatedData.title,
-    description: validatedData.description || null,
-    dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
-    priority: validatedData.priority || null,
-    category: validatedData.category || null,
-    assignedTo: validatedData.assignedTo || userId,
-    teamId: validatedData.teamId,
-    createdBy: validatedData.createdBy,
-    updatedBy: validatedData.updatedBy || null,
-    status: taskStatusEnum.enumValues[0]
+    updatedBy: userId,
+    createdAt: new Date(),
+    updatedAt: new Date()
   };
 
-  const result = await db.insert(familyTasks).values(taskData).returning();
+  const result = await db.insert(familyTasks).values(newTask).returning();
   return result[0];
 }
 
@@ -184,23 +220,36 @@ async function createEvent(data: any, userId: string) {
   return result[0];
 }
 
-async function executeSQL(query: string, params?: unknown[]) {
-  if (!params) {
-    return await db.execute(sql.raw(query));
-  }
+async function executeSQL(query: string, params: string[] = []) {
+  try {
+    if (!params || params.length === 0) {
+      return await db.execute(sql.raw(query));
+    }
 
-  const paramPlaceholders = params.map((_, i) => `$${i + 1}`).join(', ');
-  const template = query.replace(/\?/g, () => paramPlaceholders);
-  const sqlQuery = sql.raw(template);
-  const sqlParams = params.map(param => sql.raw(String(param)));
-  const sqlParamsArray = sqlParams.reduce((acc, param) => [...acc, param], [] as unknown[]);
-  return await db.execute(sql`${sqlQuery} ${sql.join(sqlParamsArray, sql`, `)}`);
+    // Create a parameterized query using sql template literal
+    const enrichedQuery = params.reduce((acc, param, index) => {
+      return acc.replace(`$${index + 1}`, `'${param}'`);
+    }, query);
+
+    return await db.execute(sql.raw(enrichedQuery));
+  } catch (error) {
+    console.error('Error executing SQL query:', error);
+    throw error;
+  }
 }
 
-async function executeStoredProcedure(procedureName: string, params?: unknown[]) {
-  const paramString = params ? params.map((_, i) => `$${i + 1}`).join(', ') : '';
-  const query = `CALL ${procedureName}(${paramString})`;
-  return await executeSQL(query, params);
+async function executeStoredProcedure(procedureName: string, params: string[] = []) {
+  try {
+    // Create a parameterized query using sql template literal
+    const enrichedQuery = params.reduce((acc, param, index) => {
+      return acc.replace(`$${index + 1}`, `'${param}'`);
+    }, `CALL ${procedureName}(${params.map((_, i) => `$${i + 1}`).join(', ')})`);
+
+    return await db.execute(sql.raw(enrichedQuery));
+  } catch (error) {
+    console.error('Error executing stored procedure:', error);
+    throw error;
+  }
 }
 
 async function executeGraphQL(query: string, variables?: Record<string, unknown>) {

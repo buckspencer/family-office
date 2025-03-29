@@ -42,8 +42,8 @@ export default function DashboardContent({ team }: DashboardContentProps) {
   async function loadTasks() {
     if (!team) return;
     try {
-      const result = await getTasks(team.id);
-      setTasks(result.success ? (result.tasks || []) : []);
+      const tasks = await getTasks(team.id);
+      setTasks(tasks);
     } catch (error) {
       console.error('Failed to load tasks:', error);
       setTasks([]);

@@ -27,7 +27,10 @@ export interface ResourceManager<T extends BaseResource> {
 
 // Resource action types
 export type ResourceAction = {
-  type: 'execute_sql' | 'execute_stored_procedure' | 'execute_graphql' | 'create_task' | 'create_document' | 'create_subscription' | 'create_event' | 'error';
+  type: 'execute_sql' | 'execute_stored_procedure' | 'execute_graphql' | 
+        'create_task' | 'create_document' | 'create_subscription' | 'create_event' | 
+        'preview_task' | 'preview_document' | 'preview_subscription' | 'preview_event' | 
+        'error';
   data?: {
     query?: string;
     params?: any[];
@@ -36,7 +39,7 @@ export type ResourceAction = {
     title?: string;
     description?: string;
     dueDate?: string;
-    priority?: 'low' | 'medium' | 'high';
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
     category?: string;
     assignedTo?: string;
     type?: string;
@@ -50,6 +53,7 @@ export type ResourceAction = {
     location?: string;
     attendees?: string[];
     requiresConfirmation?: boolean;
+    teamId?: number;
   };
   error?: string;
   requiresConfirmation?: boolean;
