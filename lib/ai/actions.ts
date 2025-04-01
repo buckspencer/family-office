@@ -17,13 +17,10 @@ import { NewFamilyTask, NewFamilyDocument, NewFamilySubscription, NewFamilyEvent
 const TaskDataSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
-  dueDate: z.string().optional(),
-  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
-  category: z.string().optional(),
-  assignedTo: z.string().uuid().optional(),
   teamId: z.number(),
-  createdBy: z.string().uuid(),
-  updatedBy: z.string().uuid().optional()
+  assignedTo: z.string().uuid(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
+  dueDate: z.string().optional(),
 });
 
 const DocumentDataSchema = z.object({
@@ -84,7 +81,10 @@ export async function executeAction(action: ResourceAction) {
         return await createTask({
           title: action.data.title,
           description: action.data.description,
-          teamId: action.data.teamId
+          teamId: action.data.teamId,
+          assignedTo: action.data.assignedTo || session.user.id,
+          priority: action.data.priority,
+          dueDate: action.data.dueDate
         }, session.user.id);
         
       case 'create_document':
@@ -135,22 +135,47 @@ export async function executeAction(action: ResourceAction) {
   }
 }
 
-export async function createTask(data: { title: string; description?: string; teamId?: number }, userId: string) {
-  const newTask: NewFamilyTask = {
-    title: data.title,
-    description: data.description || null,
-    status: 'pending',
-    priority: 'medium',
-    assignedTo: userId,
-    teamId: data.teamId || 1,
+export async function createTask(data: { 
+  title: string; 
+  description?: string; 
+  teamId?: number;
+  assignedTo?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  dueDate?: string;
+}, userId: string) {
+  console.log('Starting createTask with data:', { data, userId });
+  
+  // Validate input data
+  const validatedData = TaskDataSchema.parse({
+    ...data,
+    assignedTo: data.assignedTo || userId,
+    teamId: data.teamId || 2  // Default to team ID 2
+  });
+  console.log('Validated task data:', validatedData);
+
+  const newTask = {
+    title: validatedData.title,
+    description: validatedData.description || null,
+    status: taskStatusEnum.enumValues[0], // 'pending'
+    priority: validatedData.priority,
+    assignedTo: validatedData.assignedTo,
+    teamId: validatedData.teamId,
     createdBy: userId,
     updatedBy: userId,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null
   };
 
-  const result = await db.insert(familyTasks).values(newTask).returning();
-  return result[0];
+  console.log('Creating task with data:', newTask);
+  try {
+    const result = await db.insert(familyTasks).values(newTask).returning();
+    console.log('Task creation result:', result);
+    return result[0];
+  } catch (error) {
+    console.error('Error creating task:', error);
+    throw error;
+  }
 }
 
 async function createDocument(data: any, userId: string) {

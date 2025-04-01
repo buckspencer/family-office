@@ -1,13 +1,10 @@
-import { ChatMessage, Task, ChatAction } from '@/lib/types/chat';
+import { ChatMessage, MessageState } from '@/lib/types/chat';
 import { sendMessage } from '@/app/(dashboard)/dashboard/actions';
-import { createTask } from '@/lib/ai/actions';
-import { AIResponse, ResourceAction } from '@/lib/resources/base/types';
-
-export type MessageState = {
-  messages: ChatMessage[];
-  error: string | null;
-  isLoading: boolean;
-};
+import { AIResponse } from '@/lib/types/chat';
+import { FamilyAIChat } from '@/lib/db/schema';
+import { getSession } from '@/lib/auth/session';
+import { db } from '@/lib/db/drizzle';
+import { sql } from 'drizzle-orm';
 
 export class MessageController {
   private state: MessageState;
@@ -26,17 +23,36 @@ export class MessageController {
     this.state = { ...this.state, ...updates };
   }
 
-  private convertResourceActionToChatAction(action: ResourceAction): ChatAction {
-    return {
-      type: action.type === 'create_task' ? 'create_task' : 'ignore',
-      data: action.data
-    };
+  private async processDBAction(action: AIResponse['system']['db_action']) {
+    if (!action) return;
+
+    const { operation, table, query, params, metadata } = action;
+    
+    // Execute through Drizzle
+    const result = await db.execute(sql.raw(query));
+      
+    // Handle notifications if needed
+    if (metadata?.notification_required) {
+      await this.notifyRelevantUsers(result);
+    }
+
+    return result;
+  }
+
+  private async notifyRelevantUsers(data: any) {
+    // Implement notification logic here
+    console.log('Notifying users about:', data);
   }
 
   async processMessage(content: string): Promise<{ success: boolean; error?: Error }> {
     this.updateState({ isLoading: true, error: null });
 
     try {
+      const session = await getSession();
+      if (!session?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+
       // Add user message
       const userMessage: ChatMessage = {
         role: 'user',
@@ -47,40 +63,14 @@ export class MessageController {
 
       // Get AI response
       const response = await sendMessage(this.teamId, content);
-      console.log('MessageController - AI Response:', response);
       
-      if ('message' in response) {
-        const aiMessage: ChatMessage = {
-          role: 'assistant',
-          content: response.message,
-          timestamp: new Date(),
-          action: response.action ? this.convertResourceActionToChatAction(response.action) : undefined
-        };
-        this.state.messages.push(aiMessage);
-
-        // Handle any actions
-        if (response.action?.type === 'create_task' && response.action.data) {
-          const taskData = {
-            title: response.action.data.title || 'New Task',
-            description: response.action.data.description,
-            teamId: this.teamId
-          };
-          const result = await createTask(taskData, this.teamId.toString());
-          if (result) {
-            const taskMessage: ChatMessage = {
-              role: 'system',
-              content: `Task created: ${taskData.title}`,
-              timestamp: new Date()
-            };
-            this.state.messages.push(taskMessage);
-          }
-        }
-      } else if (response.success && response.chatEntry) {
+      if (response.success && response.chatEntry) {
+        // Add AI message with user-facing content
         const aiMessage: ChatMessage = {
           role: 'assistant',
           content: response.chatEntry.message,
           timestamp: response.chatEntry.timestamp,
-          action: response.chatEntry.action ? this.convertResourceActionToChatAction(response.chatEntry.action as ResourceAction) : undefined
+          display_data: response.chatEntry.action
         };
         this.state.messages.push(aiMessage);
       }
@@ -88,10 +78,8 @@ export class MessageController {
       this.updateState({ isLoading: false });
       return { success: true };
     } catch (error) {
-      this.updateState({ 
-        isLoading: false, 
-        error: error instanceof Error ? error.message : 'An error occurred' 
-      });
+      console.error('Error in processMessage:', error);
+      this.updateState({ isLoading: false, error: error instanceof Error ? error.message : 'An error occurred' });
       return { success: false, error: error instanceof Error ? error : new Error('An error occurred') };
     }
   }

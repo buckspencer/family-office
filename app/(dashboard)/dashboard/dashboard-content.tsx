@@ -5,8 +5,10 @@ import { Chat } from '@/components/ui/chat';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { sendMessage, getChatHistory, getTasks } from './actions';
+import { sendMessage, getChatHistory, getTasks, confirmAction, updateChatEntry, createTask } from './actions';
 import type { FamilyAIChat, FamilyTask } from '@/lib/db/schema';
+import type { ChatMessage, Task, ChatAction } from '@/lib/types/chat';
+import type { ResourceAction } from '@/lib/resources/base/types';
 
 interface DashboardContentProps {
   team: {
@@ -21,6 +23,7 @@ export default function DashboardContent({ team }: DashboardContentProps) {
   const [messages, setMessages] = useState<FamilyAIChat[]>([]);
   const [tasks, setTasks] = useState<FamilyTask[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [taskToConfirm, setTaskToConfirm] = useState<ChatAction | null>(null);
 
   useEffect(() => {
     if (team) {
@@ -54,15 +57,97 @@ export default function DashboardContent({ team }: DashboardContentProps) {
     if (!team) return;
     setIsLoading(true);
     try {
-      await sendMessage(team.id, message);
-      await loadChatHistory();
-      await loadTasks(); // Reload tasks after sending message
+      const response = await sendMessage(team.id, message);
+      if (response.success) {
+        await loadChatHistory();
+        // If there's a task to confirm, show the confirmation dialog
+        const action = response.chatEntry?.action as ResourceAction;
+        if (action?.type === 'create_task' && action.data) {
+          setTaskToConfirm({
+            type: 'create_task',
+            data: {
+              title: action.data.title || '',
+              description: action.data.description,
+              dueDate: action.data.dueDate,
+              priority: action.data.priority,
+              requiresConfirmation: action.data.requiresConfirmation
+            }
+          });
+        }
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
     } finally {
       setIsLoading(false);
     }
   }
+
+  const handleConfirmTask = async (task: ChatAction) => {
+    console.log('Starting task confirmation process:', task);
+    
+    // Find the corresponding chat entry
+    const chatEntry = messages.find(
+      (msg) => {
+        const action = msg.action as ResourceAction;
+        return action && 
+          action.type === 'create_task' && 
+          action.data?.title === task.data?.title;
+      }
+    );
+    
+    if (!chatEntry) {
+      console.error('No matching chat entry found for task:', task);
+      return;
+    }
+    
+    console.log('Found matching chat entry:', chatEntry);
+    
+    try {
+      // Update the chat entry status
+      const updatedEntry = await updateChatEntry(chatEntry.id, 'completed');
+      console.log('Updated chat entry status:', updatedEntry);
+      
+      // Create the task
+      if (!task.data?.title || !chatEntry.userId || !chatEntry.teamId) {
+        console.error('Missing required fields for task creation:', task.data);
+        return;
+      }
+      
+      const newTask = await createTask({
+        title: task.data.title,
+        description: task.data.description,
+        dueDate: task.data.dueDate,
+        priority: task.data.priority,
+        assignedTo: chatEntry.userId,
+        teamId: chatEntry.teamId
+      });
+      console.log('Created new task:', newTask);
+      
+      // Update local state
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === chatEntry.id
+            ? { ...msg, status: 'completed' }
+            : msg
+        )
+      );
+      
+      // Refresh tasks
+      await loadTasks();
+      console.log('Tasks refreshed after creation');
+      
+      setTaskToConfirm(null);
+      console.log('Task confirmation process completed successfully');
+    } catch (error) {
+      console.error('Error during task confirmation:', error);
+      // Revert the chat entry status on error
+      await updateChatEntry(chatEntry.id, 'pending');
+    }
+  };
+
+  const handleCancelTask = () => {
+    setTaskToConfirm(null);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -93,12 +178,15 @@ export default function DashboardContent({ team }: DashboardContentProps) {
           <div className="rounded-lg border bg-white shadow-sm p-4 h-[400px]">
             <Chat
               messages={messages.map(msg => ({
-                role: msg.role as 'user' | 'assistant',
+                role: msg.role as 'user' | 'assistant' | 'system',
                 content: msg.message,
-                timestamp: new Date(msg.timestamp)
+                timestamp: msg.timestamp,
+                action: msg.action as ChatAction
               }))}
               onSendMessage={handleSendMessage}
-              isLoading={isLoading}
+              onConfirmTask={handleConfirmTask}
+              onCancelTask={handleCancelTask}
+              taskToConfirm={taskToConfirm}
             />
           </div>
         </div>
@@ -154,7 +242,7 @@ export default function DashboardContent({ team }: DashboardContentProps) {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-500">No pending tasks</p>
+            <p className="text-sm text-gray-500">No tasks assigned</p>
           )}
         </Card>
 

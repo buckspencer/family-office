@@ -137,8 +137,13 @@ export async function executeDatabaseQuery(
 
 export async function validateQuery(query: DatabaseQuery): Promise<boolean> {
   try {
+    // Replace parameters with appropriate dummy values for validation
+    const dummyQuery = query.query
+      .replace(/\$[0-9]+::uuid/g, "'00000000-0000-0000-0000-000000000000'")
+      .replace(/\$[0-9]+/g, 'NULL');
+    
     // Parse query to check syntax
-    await db.execute(sql.raw('EXPLAIN ' + query.query));
+    await db.execute(sql.raw('EXPLAIN ' + dummyQuery));
     
     // Validate query safety
     if (!isQuerySafe(query.query)) {
