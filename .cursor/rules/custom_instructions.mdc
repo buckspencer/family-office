@@ -1,3 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
 1. **Use `cursor_project_rules` as the Knowledge Base**: Always refer to `cursor_project_rules` to understand the context of the project. Do not code anything outside of the context provided in the `cursor_project_rules` folder. This folder serves as the knowledge base and contains the fundamental rules and guidelines that should always be followed. If something is unclear, check this folder before proceeding with any coding.
 
 2. **Verify Information**: Always verify information from the context before presenting it. Do not make assumptions or speculate without clear evidence.

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { teams, actionLogs, users, teamMembers, familyMemories, familySubscriptions, familyTasks, familyDates, familyInformation, familyDocuments, familyEvents, activityLogs, familyAiChats, invitations } from "./schema";
+import { teams, actionLogs, users, teamMembers, familyInformation, familyDocuments, familyMemories, familySubscriptions, familyTasks, familyDates, familyEvents, activityLogs, familyAiChats, invitations } from "./schema";
 
 export const actionLogsRelations = relations(actionLogs, ({one}) => ({
 	team: one(teams, {
@@ -15,12 +15,12 @@ export const actionLogsRelations = relations(actionLogs, ({one}) => ({
 export const teamsRelations = relations(teams, ({one, many}) => ({
 	actionLogs: many(actionLogs),
 	teamMembers: many(teamMembers),
+	familyInformations: many(familyInformation),
+	familyDocuments: many(familyDocuments),
 	familyMemories: many(familyMemories),
 	familySubscriptions: many(familySubscriptions),
 	familyTasks: many(familyTasks),
 	familyDates: many(familyDates),
-	familyInformations: many(familyInformation),
-	familyDocuments: many(familyDocuments),
 	user_createdBy: one(users, {
 		fields: [teams.createdBy],
 		references: [users.id],
@@ -39,6 +39,15 @@ export const teamsRelations = relations(teams, ({one, many}) => ({
 
 export const usersRelations = relations(users, ({one, many}) => ({
 	actionLogs: many(actionLogs),
+	teamMembers_createdBy: many(teamMembers, {
+		relationName: "teamMembers_createdBy_users_id"
+	}),
+	teamMembers_updatedBy: many(teamMembers, {
+		relationName: "teamMembers_updatedBy_users_id"
+	}),
+	teamMembers_userId: many(teamMembers, {
+		relationName: "teamMembers_userId_users_id"
+	}),
 	user_createdBy: one(users, {
 		fields: [users.createdBy],
 		references: [users.id],
@@ -55,14 +64,17 @@ export const usersRelations = relations(users, ({one, many}) => ({
 	users_updatedBy: many(users, {
 		relationName: "users_updatedBy_users_id"
 	}),
-	teamMembers_createdBy: many(teamMembers, {
-		relationName: "teamMembers_createdBy_users_id"
+	familyInformations_createdBy: many(familyInformation, {
+		relationName: "familyInformation_createdBy_users_id"
 	}),
-	teamMembers_updatedBy: many(teamMembers, {
-		relationName: "teamMembers_updatedBy_users_id"
+	familyInformations_updatedBy: many(familyInformation, {
+		relationName: "familyInformation_updatedBy_users_id"
 	}),
-	teamMembers_userId: many(teamMembers, {
-		relationName: "teamMembers_userId_users_id"
+	familyDocuments_createdBy: many(familyDocuments, {
+		relationName: "familyDocuments_createdBy_users_id"
+	}),
+	familyDocuments_updatedBy: many(familyDocuments, {
+		relationName: "familyDocuments_updatedBy_users_id"
 	}),
 	familyMemories_createdBy: many(familyMemories, {
 		relationName: "familyMemories_createdBy_users_id"
@@ -90,18 +102,6 @@ export const usersRelations = relations(users, ({one, many}) => ({
 	}),
 	familyDates_updatedBy: many(familyDates, {
 		relationName: "familyDates_updatedBy_users_id"
-	}),
-	familyInformations_createdBy: many(familyInformation, {
-		relationName: "familyInformation_createdBy_users_id"
-	}),
-	familyInformations_updatedBy: many(familyInformation, {
-		relationName: "familyInformation_updatedBy_users_id"
-	}),
-	familyDocuments_createdBy: many(familyDocuments, {
-		relationName: "familyDocuments_createdBy_users_id"
-	}),
-	familyDocuments_updatedBy: many(familyDocuments, {
-		relationName: "familyDocuments_updatedBy_users_id"
 	}),
 	teams_createdBy: many(teams, {
 		relationName: "teams_createdBy_users_id"
@@ -139,6 +139,40 @@ export const teamMembersRelations = relations(teamMembers, ({one}) => ({
 		fields: [teamMembers.userId],
 		references: [users.id],
 		relationName: "teamMembers_userId_users_id"
+	}),
+}));
+
+export const familyInformationRelations = relations(familyInformation, ({one}) => ({
+	user_createdBy: one(users, {
+		fields: [familyInformation.createdBy],
+		references: [users.id],
+		relationName: "familyInformation_createdBy_users_id"
+	}),
+	team: one(teams, {
+		fields: [familyInformation.teamId],
+		references: [teams.id]
+	}),
+	user_updatedBy: one(users, {
+		fields: [familyInformation.updatedBy],
+		references: [users.id],
+		relationName: "familyInformation_updatedBy_users_id"
+	}),
+}));
+
+export const familyDocumentsRelations = relations(familyDocuments, ({one}) => ({
+	user_createdBy: one(users, {
+		fields: [familyDocuments.createdBy],
+		references: [users.id],
+		relationName: "familyDocuments_createdBy_users_id"
+	}),
+	team: one(teams, {
+		fields: [familyDocuments.teamId],
+		references: [teams.id]
+	}),
+	user_updatedBy: one(users, {
+		fields: [familyDocuments.updatedBy],
+		references: [users.id],
+		relationName: "familyDocuments_updatedBy_users_id"
 	}),
 }));
 
@@ -212,40 +246,6 @@ export const familyDatesRelations = relations(familyDates, ({one}) => ({
 		fields: [familyDates.updatedBy],
 		references: [users.id],
 		relationName: "familyDates_updatedBy_users_id"
-	}),
-}));
-
-export const familyInformationRelations = relations(familyInformation, ({one}) => ({
-	user_createdBy: one(users, {
-		fields: [familyInformation.createdBy],
-		references: [users.id],
-		relationName: "familyInformation_createdBy_users_id"
-	}),
-	team: one(teams, {
-		fields: [familyInformation.teamId],
-		references: [teams.id]
-	}),
-	user_updatedBy: one(users, {
-		fields: [familyInformation.updatedBy],
-		references: [users.id],
-		relationName: "familyInformation_updatedBy_users_id"
-	}),
-}));
-
-export const familyDocumentsRelations = relations(familyDocuments, ({one}) => ({
-	user_createdBy: one(users, {
-		fields: [familyDocuments.createdBy],
-		references: [users.id],
-		relationName: "familyDocuments_createdBy_users_id"
-	}),
-	team: one(teams, {
-		fields: [familyDocuments.teamId],
-		references: [teams.id]
-	}),
-	user_updatedBy: one(users, {
-		fields: [familyDocuments.updatedBy],
-		references: [users.id],
-		relationName: "familyDocuments_updatedBy_users_id"
 	}),
 }));
 
