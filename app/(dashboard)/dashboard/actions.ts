@@ -54,34 +54,33 @@ export async function sendMessage(teamId: number, content: string) {
 
     // Store the AI's response
     let chatEntry;
-    if (aiResponse.action) {
+    if (aiResponse.system?.db_action) {
       // Validate action data
-      if (!aiResponse.action.data) {
-        console.error('Invalid action data:', aiResponse.action);
+      if (!aiResponse.system.db_action.metadata) {
+        console.error('Invalid action data:', aiResponse.system.db_action);
         throw new Error('Invalid action data received from AI');
       }
 
-      const requiresConfirmation = aiResponse.action.requiresConfirmation || aiResponse.action.data.requiresConfirmation || true;
+      const requiresConfirmation = aiResponse.system.db_action.metadata.requires_confirmation ?? true;
 
       // Ensure the action data has the correct user ID and team ID
       const actionData = {
-        ...aiResponse.action.data,
-        assignedTo: session.user.id,
-        teamId: teamId,
-        requiresConfirmation: requiresConfirmation
+        ...aiResponse.system.db_action,
+        metadata: {
+          ...aiResponse.system.db_action.metadata,
+          assignedTo: session.user.id,
+          teamId: teamId,
+          requiresConfirmation
+        }
       };
 
       const [newChatEntry] = await db.insert(familyAIChats).values({
         teamId,
         userId: session.user.id,
-        message: aiResponse.message,
+        message: aiResponse.user.message,
         role: 'assistant',
         status: 'pending',
-        action: {
-          type: aiResponse.action.type,
-          data: actionData,
-          requiresConfirmation: requiresConfirmation
-        },
+        action: actionData,
         timestamp: new Date(),
       }).returning();
 
@@ -89,14 +88,11 @@ export async function sendMessage(teamId: number, content: string) {
 
       // If action doesn't require confirmation, execute it immediately
       if (!requiresConfirmation) {
-        console.log('Executing action immediately:', { action: aiResponse.action });
+        console.log('Executing action immediately:', { action: actionData });
         try {
           const result = await executeAction({
-            type: aiResponse.action.type,
-            data: {
-              ...actionData,
-              requiresConfirmation: false
-            },
+            type: actionData.operation,
+            data: actionData,
             requiresConfirmation: false
           } as ResourceAction);
           console.log('Action execution result:', { result });
@@ -111,7 +107,10 @@ export async function sendMessage(teamId: number, content: string) {
           console.error('Error executing action:', error);
           // Update chat entry status to error
           await db.update(familyAIChats)
-            .set({ status: 'error' })
+            .set({ 
+              status: 'error',
+              error: error instanceof Error ? error.message : 'Unknown error'
+            })
             .where(eq(familyAIChats.id, newChatEntry.id));
           throw error;
         }
@@ -121,7 +120,7 @@ export async function sendMessage(teamId: number, content: string) {
       const [newChatEntry] = await db.insert(familyAIChats).values({
         teamId,
         userId: session.user.id,
-        message: aiResponse.message,
+        message: aiResponse.user.message,
         role: 'assistant',
         status: 'completed',
         timestamp: new Date(),
