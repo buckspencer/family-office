@@ -109,13 +109,13 @@ export async function executeAction(action: ResourceAction) {
         if (!action.data.query) {
           throw new Error('SQL query is required');
         }
-        return await executeSQL(action.data.query, (action.data.params || []).map(String));
+        return await executeSQL(action.data.query);
         
       case 'execute_stored_procedure':
         if (!action.data.procedureName) {
           throw new Error('Stored procedure name is required');
         }
-        return await executeStoredProcedure(action.data.procedureName, (action.data.params || []).map(String));
+        return await executeStoredProcedure(action.data.procedureName);
         
       case 'execute_graphql':
         if (!action.data.query) {
@@ -245,32 +245,19 @@ async function createEvent(data: any, userId: string) {
   return result[0];
 }
 
-async function executeSQL(query: string, params: string[] = []) {
+export async function executeSQL(query: string) {
   try {
-    if (!params || params.length === 0) {
-      return await db.execute(sql.raw(query));
-    }
-
-    // Create a parameterized query using sql template literal
-    const enrichedQuery = params.reduce((acc, param, index) => {
-      return acc.replace(`$${index + 1}`, `'${param}'`);
-    }, query);
-
-    return await db.execute(sql.raw(enrichedQuery));
+    return await db.execute(sql.raw(query));
   } catch (error) {
-    console.error('Error executing SQL query:', error);
+    console.error('Error executing SQL:', error);
     throw error;
   }
 }
 
-async function executeStoredProcedure(procedureName: string, params: string[] = []) {
+export async function executeStoredProcedure(procedureName: string) {
   try {
-    // Create a parameterized query using sql template literal
-    const enrichedQuery = params.reduce((acc, param, index) => {
-      return acc.replace(`$${index + 1}`, `'${param}'`);
-    }, `CALL ${procedureName}(${params.map((_, i) => `$${i + 1}`).join(', ')})`);
-
-    return await db.execute(sql.raw(enrichedQuery));
+    const query = `CALL ${procedureName}()`;
+    return await db.execute(sql.raw(query));
   } catch (error) {
     console.error('Error executing stored procedure:', error);
     throw error;

@@ -1,51 +1,35 @@
 import { ChatMessage, MessageState } from '@/lib/types/chat';
 import { sendMessage } from '@/app/(dashboard)/dashboard/actions';
 import { AIResponse } from '@/lib/types/chat';
-import { FamilyAIChat } from '@/lib/db/schema';
 import { getSession } from '@/lib/auth/session';
 import { db } from '@/lib/db/drizzle';
 import { sql } from 'drizzle-orm';
 
 export class MessageController {
   private state: MessageState;
-  private teamId: number;
 
-  constructor(teamId: number) {
-    this.teamId = teamId;
+  constructor() {
     this.state = {
-      messages: [],
-      error: null,
-      isLoading: false
+      messages: []
     };
-  }
-
-  private updateState(updates: Partial<MessageState>) {
-    this.state = { ...this.state, ...updates };
   }
 
   private async processDBAction(action: AIResponse['system']['db_action']) {
     if (!action) return;
 
-    const { operation, table, query, params, metadata } = action;
-    
-    // Execute through Drizzle
-    const result = await db.execute(sql.raw(query));
-      
-    // Handle notifications if needed
-    if (metadata?.notification_required) {
-      await this.notifyRelevantUsers(result);
-    }
-
-    return result;
+    const { query } = action;
+    return await db.execute(sql.raw(query));
   }
 
-  private async notifyRelevantUsers(data: any) {
-    // Implement notification logic here
-    console.log('Notifying users about:', data);
+  async handleMessage(response: AIResponse) {
+    if (response.system?.db_action) {
+      return await this.processDBAction(response.system.db_action);
+    }
+    return null;
   }
 
   async processMessage(content: string): Promise<{ success: boolean; error?: Error }> {
-    this.updateState({ isLoading: true, error: null });
+    this.state.messages.push({ role: 'user', content, timestamp: new Date() });
 
     try {
       const session = await getSession();
@@ -53,33 +37,24 @@ export class MessageController {
         throw new Error('User not authenticated');
       }
 
-      // Add user message
-      const userMessage: ChatMessage = {
-        role: 'user',
-        content,
-        timestamp: new Date()
-      };
-      this.state.messages.push(userMessage);
-
       // Get AI response
-      const response = await sendMessage(this.teamId, content);
+      const response = await sendMessage(content);
       
       if (response.success && response.chatEntry) {
         // Add AI message with user-facing content
         const aiMessage: ChatMessage = {
           role: 'assistant',
-          content: response.chatEntry.message,
-          timestamp: response.chatEntry.timestamp,
+          content: response.chatEntry.message || response.chatEntry.response || 'I apologize, but I encountered an error processing your request.',
+          timestamp: new Date(),
           display_data: response.chatEntry.action
         };
         this.state.messages.push(aiMessage);
       }
 
-      this.updateState({ isLoading: false });
       return { success: true };
     } catch (error) {
       console.error('Error in processMessage:', error);
-      this.updateState({ isLoading: false, error: error instanceof Error ? error.message : 'An error occurred' });
+      this.state.messages.push({ role: 'user', content: 'An error occurred', timestamp: new Date() });
       return { success: false, error: error instanceof Error ? error : new Error('An error occurred') };
     }
   }
