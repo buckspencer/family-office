@@ -99,7 +99,7 @@ CREATE TABLE "public"."family_events" (
     "title" varchar(255) NOT NULL,
     "description" text,
     "start_date" timestamp NOT NULL,
-    "end_date" timestamp,
+    "end_date" timestamp NOT NULL,
     "status" event_status NOT NULL DEFAULT 'scheduled',
     "created_at" timestamp DEFAULT now() NOT NULL,
     "updated_at" timestamp DEFAULT now() NOT NULL,

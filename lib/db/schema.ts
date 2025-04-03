@@ -352,7 +352,7 @@ export const familyTasks = pgTable('family_tasks', {
 
 export const familyDocuments = pgTable('family_documents', {
   id: serial('id').primaryKey(),
-  teamId: integer('team_id')
+  teamId: uuid('team_id')
     .notNull()
     .references(() => teams.id, { onDelete: 'cascade' }),
   title: varchar('title', { length: 255 }).notNull(),
@@ -369,7 +369,7 @@ export const familyDocuments = pgTable('family_documents', {
 
 export const familyEvents = pgTable('family_events', {
   id: serial('id').primaryKey(),
-  teamId: integer('team_id')
+  teamId: uuid('team_id')
     .notNull()
     .references(() => teams.id, { onDelete: 'cascade' }),
   title: varchar('title', { length: 255 }).notNull(),

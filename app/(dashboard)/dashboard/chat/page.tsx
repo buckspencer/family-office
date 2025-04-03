@@ -6,29 +6,36 @@ import { useState, useEffect, useRef } from 'react';
 import type { FamilyAIChat } from '@/lib/db/schema';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { ChatMessage } from '@/lib/types/chat';
+import { ChatMessage, ChatAction } from '@/lib/types/chat';
 import { toast } from 'sonner';
 import { MessageController } from '@/lib/controllers/message-controller';
 import { useParams } from 'next/navigation';
+import { confirmAction } from '@/app/(dashboard)/dashboard/actions';
 
 export default function ChatPage() {
   const { teamId } = useParams();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [taskToConfirm, setTaskToConfirm] = useState<ChatAction | null>(null);
   const messageController = useRef<MessageController | null>(null);
 
   useEffect(() => {
     if (teamId && !messageController.current) {
-      messageController.current = new MessageController(Number(teamId));
+      messageController.current = new MessageController(teamId as string);
     }
   }, [teamId]);
 
   const loadChatHistory = async () => {
     try {
-      const response = await fetch('/api/chat/history');
+      const response = await fetch(`/api/chat/history?teamId=${teamId}`);
       const data = await response.json();
-      setMessages(data.messages);
+      setMessages(data.messages.map((msg: any) => ({
+        role: msg.role,
+        content: msg.message || msg.content,
+        timestamp: new Date(msg.timestamp),
+        display_data: msg.action
+      })));
     } catch (error) {
       console.error('Failed to load chat history:', error);
       toast.error('Failed to load chat history');
@@ -36,8 +43,10 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    loadChatHistory();
-  }, []);
+    if (teamId) {
+      loadChatHistory();
+    }
+  }, [teamId]);
 
   const handleSendMessage = async (content: string) => {
     if (!messageController.current) return;
@@ -63,14 +72,37 @@ export default function ChatPage() {
     }
   };
 
+  const handleConfirmTask = async (task: ChatAction) => {
+    try {
+      if (!task.data.title || !task.data.assignedTo || !task.data.teamId) {
+        throw new Error('Missing required task fields');
+      }
+
+      const result = await confirmAction(task.id!);
+      if (!result.success) {
+        setError(result.error || 'Failed to confirm task');
+        toast.error('Failed to confirm task');
+      } else {
+        toast.success('Task confirmed successfully');
+        setTaskToConfirm(null);
+        loadChatHistory(); // Reload chat history to show updated task status
+      }
+    } catch (error) {
+      console.error('Error confirming task:', error);
+      setError(error instanceof Error ? error.message : 'Failed to confirm task');
+      toast.error('Failed to confirm task');
+    }
+  };
+
+  const handleCancelTask = () => {
+    setTaskToConfirm(null);
+  };
+
   const mappedMessages = messages.map(msg => ({
     role: msg.role as 'user' | 'assistant',
     content: msg.content,
     timestamp: new Date(msg.timestamp),
-    action: msg.action ? {
-      type: (msg.action as any).type,
-      data: (msg.action as any).data?.data || (msg.action as any).data
-    } : undefined
+    action: msg.display_data
   }));
 
   return (
@@ -87,7 +119,9 @@ export default function ChatPage() {
           <Chat
             messages={mappedMessages}
             onSendMessage={handleSendMessage}
-            isLoading={isLoading}
+            onConfirmTask={handleConfirmTask}
+            onCancelTask={handleCancelTask}
+            taskToConfirm={taskToConfirm}
           />
         </Card>
       </div>

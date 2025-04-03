@@ -4,6 +4,7 @@ import { and, eq, isNull, desc, asc, gte } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db/drizzle';
 import { familyTasks, familyEvents } from '@/lib/db/schema';
+import { logger } from '@/lib/ai/logger';
 
 // Encryption key management
 const ENCRYPTION_KEY = process.env.AI_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
@@ -29,6 +30,32 @@ function decrypt(text: string): string {
   return decrypted;
 }
 
+export const PendingActionSchema = z.object({
+  type: z.string(),
+  action: z.any(),
+  requiresConfirmation: z.boolean().default(true),
+  createdAt: z.date(),
+  expiresAt: z.date(),
+  confirmed: z.boolean().default(false),
+  executed: z.boolean().default(false),
+  description: z.string().optional(),
+});
+
+export type PendingAction = z.infer<typeof PendingActionSchema>;
+
+export const MessageHistorySchema = z.object({
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.string(),
+  timestamp: z.date(),
+  metadata: z.object({
+    action: z.string().optional(),
+    requires_confirmation: z.boolean().optional(),
+    tokensUsed: z.number().optional()
+  }).optional()
+});
+
+export type MessageHistory = z.infer<typeof MessageHistorySchema>;
+
 export const ConversationContextSchema = z.object({
   userId: z.string(),
   teamId: z.string(),
@@ -36,18 +63,14 @@ export const ConversationContextSchema = z.object({
   lastInteraction: z.date(),
   messageCount: z.number().default(0),
   totalTokens: z.number().default(0),
-  encryptedData: z.string().optional(),
+  messages: z.array(MessageHistorySchema).default([]),
+  pendingAction: PendingActionSchema.optional(),
   recentTasks: z.array(z.object({
     id: z.number(),
     title: z.string(),
     status: z.string(),
     dueDate: z.date().optional(),
   })).optional(),
-  budgetStatus: z.object({
-    totalBudget: z.number(),
-    spent: z.number(),
-    remaining: z.number(),
-  }).optional(),
   importantDates: z.array(z.object({
     date: z.date(),
     description: z.string(),
@@ -99,7 +122,8 @@ export class ConversationContextManager {
         conversationId: crypto.randomUUID(),
         lastInteraction: new Date(),
         messageCount: 0,
-        totalTokens: 0
+        totalTokens: 0,
+        messages: []
       };
       this.contexts.set(key, context);
     }
@@ -107,7 +131,139 @@ export class ConversationContextManager {
     // Update context with recent data
     await this.enrichContext(context);
 
+    // Clean up expired pending actions
+    if (context.pendingAction && context.pendingAction.expiresAt < new Date()) {
+      delete context.pendingAction;
+    }
+
     return context;
+  }
+
+  async updateContext(context: ConversationContext, tokensUsed: number = 0): Promise<void> {
+    // Update the context with the latest interaction
+    context.lastInteraction = new Date();
+    context.messageCount += 1;
+    context.totalTokens += tokensUsed;
+
+    // Update the context in the map
+    const key = `${context.userId}:${context.teamId}`;
+    this.contexts.set(key, context);
+  }
+
+  async addMessage(context: ConversationContext, role: 'user' | 'assistant', content: string): Promise<void> {
+    if (!context.messages) {
+      context.messages = [];
+    }
+
+    // Add the new message
+    context.messages.push({
+      role,
+      content,
+      timestamp: new Date()
+    });
+
+    // Keep only the last 10 messages
+    if (context.messages.length > 10) {
+      context.messages = context.messages.slice(-10);
+    }
+
+    // Update the context
+    const key = `${context.userId}:${context.teamId}`;
+    this.contexts.set(key, context);
+  }
+
+  async setPendingAction(context: ConversationContext, type: string, action: any, description?: string): Promise<void> {
+    // Create a new pending action
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // Expires in 5 minutes
+
+    logger.info('Setting pending action:', {
+      type,
+      description,
+      expiresAt: expiresAt.toISOString(),
+      userId: context.userId,
+      teamId: context.teamId
+    });
+
+    context.pendingAction = {
+      type,
+      action,
+      requiresConfirmation: true,
+      createdAt: now,
+      expiresAt,
+      confirmed: false,
+      executed: false,
+      description
+    };
+
+    // Update the context
+    const key = `${context.userId}:${context.teamId}`;
+    this.contexts.set(key, context);
+  }
+
+  async confirmPendingAction(context: ConversationContext): Promise<PendingAction | null> {
+    if (!context.pendingAction) {
+      logger.info('No pending action found to confirm');
+      return null;
+    }
+
+    // Check if the action has expired
+    if (context.pendingAction.expiresAt < new Date()) {
+      logger.info('Pending action has expired');
+      delete context.pendingAction;
+      return null;
+    }
+
+    logger.info('Confirming pending action:', {
+      type: context.pendingAction.type,
+      description: context.pendingAction.description
+    });
+
+    // Mark the action as confirmed
+    context.pendingAction.confirmed = true;
+
+    // Update the context
+    const key = `${context.userId}:${context.teamId}`;
+    this.contexts.set(key, context);
+
+    return context.pendingAction;
+  }
+
+  async markPendingActionExecuted(context: ConversationContext): Promise<void> {
+    if (!context.pendingAction) {
+      logger.info('No pending action to mark as executed');
+      return;
+    }
+
+    logger.info('Marking pending action as executed:', {
+      type: context.pendingAction.type,
+      description: context.pendingAction.description
+    });
+
+    // Mark the action as executed
+    context.pendingAction.executed = true;
+
+    // Update the context
+    const key = `${context.userId}:${context.teamId}`;
+    this.contexts.set(key, context);
+  }
+
+  async clearPendingAction(context: ConversationContext): Promise<void> {
+    if (!context.pendingAction) {
+      logger.info('No pending action to clear');
+      return;
+    }
+
+    logger.info('Clearing pending action:', {
+      type: context.pendingAction.type,
+      description: context.pendingAction.description
+    });
+
+    delete context.pendingAction;
+
+    // Update the context
+    const key = `${context.userId}:${context.teamId}`;
+    this.contexts.set(key, context);
   }
 
   private async enrichContext(context: ConversationContext): Promise<void> {
@@ -123,7 +279,7 @@ export class ConversationContextManager {
         .from(familyTasks)
         .where(
           and(
-            eq(familyTasks.teamId, parseInt(context.teamId)),
+            eq(familyTasks.teamId, context.teamId),
             eq(familyTasks.createdBy, context.userId),
             isNull(familyTasks.deletedAt)
           )
@@ -148,7 +304,7 @@ export class ConversationContextManager {
         .from(familyEvents)
         .where(
           and(
-            eq(familyEvents.teamId, parseInt(context.teamId)),
+            eq(familyEvents.teamId, context.teamId),
             gte(familyEvents.startDate, new Date())
           )
         )
@@ -174,7 +330,7 @@ export class ConversationContextManager {
 
   async updateContext(context: ConversationContext, tokensUsed: number): Promise<void> {
     const key = `${context.userId}:${context.teamId}`;
-    
+
     // Check rate limits
     await this.checkRateLimits(context, tokensUsed);
 
@@ -182,12 +338,12 @@ export class ConversationContextManager {
     context.messageCount++;
     context.totalTokens += tokensUsed;
     context.lastInteraction = new Date();
-    
+
     // Encrypt sensitive data if present
     if (context.encryptedData) {
       context.encryptedData = encrypt(context.encryptedData);
     }
-    
+
     this.contexts.set(key, context);
   }
 
@@ -311,4 +467,4 @@ export class IPRateLimiter {
   clearIP(ip: string): void {
     this.ipRequests.delete(ip);
   }
-} 
+}

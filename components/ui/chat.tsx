@@ -1,248 +1,192 @@
-import { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { ChatMessage, Task, ChatAction } from '@/lib/types/chat';
-import { Plus, Clock } from 'lucide-react';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, set, startOfDay } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { ChatMessage } from "@/lib/types/chat";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface ChatProps {
-  messages: ChatMessage[];
-  onSendMessage: (message: string) => void;
-  onConfirmTask: (task: ChatAction) => void;
-  onCancelTask: () => void;
-  taskToConfirm: ChatAction | null;
+	messages: ChatMessage[];
+	onSendMessage: (message: string) => Promise<void>;
+	isLoading?: boolean;
 }
 
-export function Chat({ messages, onSendMessage, onConfirmTask, onCancelTask, taskToConfirm }: ChatProps) {
-  const [input, setInput] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(() => {
-    if (taskToConfirm?.data?.dueDate) {
-      return new Date(taskToConfirm.data.dueDate);
-    }
-    return startOfDay(new Date());
-  });
-  const [selectedPriority, setSelectedPriority] = useState<string>(taskToConfirm?.data?.priority || 'medium');
-  const [taskTitle, setTaskTitle] = useState(taskToConfirm?.data?.title || '');
-  const [taskDescription, setTaskDescription] = useState(taskToConfirm?.data?.description || '');
-  const [selectedTime, setSelectedTime] = useState('12:00');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+export function Chat({
+	messages,
+	onSendMessage,
+	isLoading = false,
+}: ChatProps) {
+	const [input, setInput] = useState("");
+	const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
+	const messagesContainerRef = useRef<HTMLDivElement>(null);
+	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (taskToConfirm) {
-      setTaskTitle(taskToConfirm.data?.title || '');
-      setTaskDescription(taskToConfirm.data?.description || '');
-      setSelectedDate(taskToConfirm.data?.dueDate ? new Date(taskToConfirm.data.dueDate) : startOfDay(new Date()));
-      setSelectedPriority(taskToConfirm.data?.priority || 'medium');
-    }
-  }, [taskToConfirm]);
+	useEffect(() => {
+		// Always update when messages array changes
+		if (messages && messages.length > 0) {
+			// Sort messages by timestamp in ascending order (oldest first)
+			const sortedMessages = [...messages].sort(
+				(a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+			);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+			// Check if messages have actually changed to avoid unnecessary re-renders
+			const hasChanged =
+				sortedMessages.length !== localMessages.length ||
+				sortedMessages.some((msg, idx) => {
+					if (idx >= localMessages.length) return true;
+					return msg.content !== localMessages[idx].content;
+				});
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+			if (hasChanged) {
+				// Update the local messages
+				setLocalMessages(sortedMessages);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (input.trim()) {
-      onSendMessage(input.trim());
-      setInput('');
-    }
-  };
+				// Force scroll to bottom after a short delay to ensure DOM has updated
+				const timer = setTimeout(() => {
+					scrollToBottom();
+				}, 100);
 
-  const handleConfirmTask = () => {
-    if (!taskToConfirm) {
-      console.log('No task to confirm in chat component');
-      return;
-    }
-    
-    console.log('Chat component: Starting task confirmation with data:', {
-      taskToConfirm,
-      taskTitle,
-      taskDescription,
-      selectedDate,
-      selectedPriority,
-      selectedTime
-    });
-    
-    // Create a new task with the updated data
-    const updatedTask: ChatAction = {
-      type: 'create_task',
-      data: {
-        title: taskTitle,
-        description: taskDescription,
-        dueDate: selectedDate ? selectedDate.toISOString() : taskToConfirm.data?.dueDate,
-        priority: selectedPriority || taskToConfirm.data?.priority,
-        requiresConfirmation: true
-      }
-    };
+				return () => clearTimeout(timer);
+			}
+		}
+	}, [messages, localMessages]);
 
-    console.log('Chat component: Created updated task:', updatedTask);
-    onConfirmTask(updatedTask);
-    onCancelTask();
-    setTaskTitle('');
-    setTaskDescription('');
-    setSelectedDate(startOfDay(new Date()));
-    setSelectedPriority('medium');
-  };
+	const scrollToBottom = () => {
+		if (messagesContainerRef.current) {
+			const scrollHeight = messagesContainerRef.current.scrollHeight;
+			const height = messagesContainerRef.current.clientHeight;
+			const maxScrollTop = scrollHeight - height;
+			messagesContainerRef.current.scrollTop =
+				maxScrollTop > 0 ? maxScrollTop : 0;
 
-  const handleCancelTask = () => {
-    onCancelTask();
-  };
+			// Double-check scroll position after a short delay
+			setTimeout(() => {
+				if (messagesContainerRef.current) {
+					const newScrollHeight = messagesContainerRef.current.scrollHeight;
+					const newHeight = messagesContainerRef.current.clientHeight;
+					const newMaxScrollTop = newScrollHeight - newHeight;
+					messagesContainerRef.current.scrollTop =
+						newMaxScrollTop > 0 ? newMaxScrollTop : 0;
+				}
+			}, 50);
+		}
 
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${
-              message.role === 'user' ? 'justify-end' : 'justify-start'
-            }`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                message.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              }`}
-            >
-              <p className="text-sm">{message.content}</p>
-              {message.action && message.action.type === 'create_task' && (
-                <Dialog open={!!taskToConfirm} onOpenChange={() => handleCancelTask()}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start mt-2">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Task
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px] bg-background">
-                    <DialogHeader>
-                      <DialogTitle>Create New Task</DialogTitle>
-                      <DialogDescription>
-                        Fill in the task details below
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="title" className="text-right">
-                          Title
-                        </Label>
-                        <Input
-                          id="title"
-                          value={taskTitle}
-                          onChange={(e) => setTaskTitle(e.target.value)}
-                          className="col-span-3"
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="description" className="text-right">
-                          Description
-                        </Label>
-                        <Input
-                          id="description"
-                          value={taskDescription}
-                          onChange={(e) => setTaskDescription(e.target.value)}
-                          className="col-span-3"
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="dueDate" className="text-right">
-                          Due Date
-                        </Label>
-                        <div className="col-span-3 flex flex-col gap-2">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !selectedDate && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={selectedDate}
-                                onSelect={setSelectedDate}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            <input
-                              type="time"
-                              value={selectedTime}
-                              onChange={(e) => setSelectedTime(e.target.value)}
-                              className="border rounded px-2 py-1 w-full"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="priority" className="text-right">
-                          Priority
-                        </Label>
-                        <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="urgent">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={handleCancelTask}>Cancel</Button>
-                      <Button type="button" onClick={handleConfirmTask}>Create Task</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1"
-          />
-          <Button type="submit">Send</Button>
-        </div>
-      </form>
-    </div>
-  );
-} 
+		// Also try to scroll to the end ref if it exists
+		if (messagesEndRef.current) {
+			messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+		}
+	};
+
+	useEffect(() => {
+		// Scroll to bottom whenever messages change
+		scrollToBottom();
+	}, [localMessages]);
+
+	// Also scroll to bottom when loading state changes
+	useEffect(() => {
+		if (!isLoading) {
+			// Small delay to ensure DOM has updated
+			const timer = setTimeout(() => {
+				scrollToBottom();
+			}, 100);
+			return () => clearTimeout(timer);
+		}
+	}, [isLoading]);
+
+	const handleSubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!input.trim() || isSubmitting) return;
+
+		setIsSubmitting(true);
+		try {
+			await onSendMessage(input.trim());
+			setInput("");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	return (
+		<div className="flex flex-col h-full">
+			<div
+				ref={messagesContainerRef}
+				className="flex-1 overflow-y-auto p-4 space-y-4"
+			>
+				{localMessages.map((message, index) => (
+					<div
+						key={index}
+						className={`flex ${
+							message.role === "user" ? "justify-end" : "justify-start"
+						}`}
+					>
+						<div
+							className={`max-w-[80%] rounded-lg p-3 ${
+								message.role === "user"
+									? "bg-primary text-primary-foreground"
+									: message.isError
+										? "bg-red-100 text-red-800 border border-red-200"
+										: "bg-muted"
+							}`}
+						>
+							{message.isError && (
+								<div className="flex items-center mb-2">
+									<AlertCircle className="h-4 w-4 mr-2 text-red-600" />
+									<span className="font-medium text-red-600">Error</span>
+								</div>
+							)}
+							<div className="prose prose-sm dark:prose-invert max-w-none">
+								{message.content.split("\n").map((line, i) => (
+									<p key={i} className="mb-1 last:mb-0">
+										{line.startsWith("- ") ? (
+											<span className="block pl-4">• {line.slice(2)}</span>
+										) : line.match(/^\d+\. /) ? (
+											<span className="block pl-4">{line}</span>
+										) : line.match(/\*\*(.*?)\*\*/) ? (
+											<span
+												dangerouslySetInnerHTML={{
+													__html: line.replace(
+														/\*\*(.*?)\*\*/g,
+														"<strong>$1</strong>"
+													),
+												}}
+											/>
+										) : (
+											line
+										)}
+									</p>
+								))}
+							</div>
+						</div>
+					</div>
+				))}
+				{isLoading && (
+					<div className="flex justify-start">
+						<div className="max-w-[80%] rounded-lg p-3 bg-muted">
+							<div className="flex items-center space-x-2">
+								<div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+								<div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]" />
+								<div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.4s]" />
+							</div>
+						</div>
+					</div>
+				)}
+				<div ref={messagesEndRef} />
+			</div>
+
+			<div className="flex-shrink-0 border-t bg-background p-4">
+				<form onSubmit={handleSubmit} className="flex gap-2">
+					<Input
+						value={input}
+						onChange={(e) => setInput(e.target.value)}
+						placeholder="Type your message..."
+						disabled={isSubmitting || isLoading}
+					/>
+					<Button type="submit" disabled={isSubmitting || isLoading}>
+						Send
+					</Button>
+				</form>
+			</div>
+		</div>
+	);
+}

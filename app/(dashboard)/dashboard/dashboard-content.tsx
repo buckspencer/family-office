@@ -1,257 +1,298 @@
-'use client';
+"use client";
 
-import { Card } from '@/components/ui/card';
-import { Chat } from '@/components/ui/chat';
-import { Button } from '@/components/ui/button';
-import { CreditCard, Clock } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { sendMessage, getChatHistory, getTasks, confirmAction, updateChatEntry, createTask } from './actions';
-import type { FamilyAIChat, FamilyTask } from '@/lib/db/schema';
-import type { ChatMessage, Task, ChatAction } from '@/lib/types/chat';
-import type { ResourceAction } from '@/lib/resources/base/types';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Clock, CreditCard, RefreshCw } from "lucide-react";
+import type { ChatMessage } from "@/lib/types/chat";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Chat } from "@/components/ui/chat";
+import { getChatHistory } from "./actions";
 
 interface DashboardContentProps {
-  team: {
-    id: number;
-    name: string;
-    subscriptionStatus: string | null;
-    planName: string | null;
-  } | null;
+	team: {
+		id: number;
+		name: string;
+		subscriptionStatus: string | null;
+		planName: string | null;
+	} | null;
 }
 
 export default function DashboardContent({ team }: DashboardContentProps) {
-  const [messages, setMessages] = useState<FamilyAIChat[]>([]);
-  const [tasks, setTasks] = useState<FamilyTask[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [taskToConfirm, setTaskToConfirm] = useState<ChatAction | null>(null);
+	const [messages, setMessages] = useState<ChatMessage[]>([]);
+	const [isLoading, setIsLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  useEffect(() => {
-    if (team) {
-      loadChatHistory();
-      loadTasks();
-    }
-  }, [team]);
+	useEffect(() => {
+		if (team) {
+			setIsLoading(true);
+			loadChatHistory()
+				.catch((error) => {
+					console.error("Error loading data:", error);
+					setError("Failed to load data");
+				})
+				.finally(() => setIsLoading(false));
+		}
+	}, [team]);
 
-  async function loadChatHistory() {
-    if (!team) return;
-    try {
-      const history = await getChatHistory(team.id);
-      setMessages(history);
-    } catch (error) {
-      console.error('Failed to load chat history:', error);
-    }
-  }
+	// Set up data refresh based on changes
+	useEffect(() => {
+		if (!team) return;
 
-  async function loadTasks() {
-    if (!team) return;
-    try {
-      const tasks = await getTasks(team.id);
-      setTasks(tasks);
-    } catch (error) {
-      console.error('Failed to load tasks:', error);
-      setTasks([]);
-    }
-  }
+		let lastMessageCount = messages.length;
+		let lastMessageUpdate = new Date();
 
-  async function handleSendMessage(message: string) {
-    if (!team) return;
-    setIsLoading(true);
-    try {
-      const response = await sendMessage(team.id, message);
-      if (response.success) {
-        await loadChatHistory();
-        // If there's a task to confirm, show the confirmation dialog
-        const action = response.chatEntry?.action as ResourceAction;
-        if (action?.type === 'create_task' && action.data) {
-          setTaskToConfirm({
-            type: 'create_task',
-            data: {
-              title: action.data.title || '',
-              description: action.data.description,
-              dueDate: action.data.dueDate,
-              priority: action.data.priority,
-              requiresConfirmation: action.data.requiresConfirmation
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+		const checkForUpdates = async () => {
+			try {
+				// Check messages
+				const history = await getChatHistory(team.id.toString());
+				if (history.length !== lastMessageCount || 
+					history.some((msg, index) => {
+						const currentMessage = messages[index];
+						if (!currentMessage) return true;
+						const currentTimestamp = new Date(msg.timestamp).getTime();
+						const previousTimestamp = currentMessage.timestamp.getTime();
+						return currentTimestamp !== previousTimestamp;
+					})) {
+					const formattedMessages = history.map((msg) => {
+						const message: ChatMessage = {
+							role: msg.role === "system" ? "assistant" : (msg.role as "user" | "assistant"),
+							content: msg.message,
+							timestamp: new Date(msg.timestamp),
+						};
 
-  const handleConfirmTask = async (task: ChatAction) => {
-    console.log('Starting task confirmation process:', task);
-    
-    // Find the corresponding chat entry
-    const chatEntry = messages.find(
-      (msg) => {
-        const action = msg.action as ResourceAction;
-        return action && 
-          action.type === 'create_task' && 
-          action.data?.title === task.data?.title;
-      }
-    );
-    
-    if (!chatEntry) {
-      console.error('No matching chat entry found for task:', task);
-      return;
-    }
-    
-    console.log('Found matching chat entry:', chatEntry);
-    
-    try {
-      // Update the chat entry status
-      const updatedEntry = await updateChatEntry(chatEntry.id, 'completed');
-      console.log('Updated chat entry status:', updatedEntry);
-      
-      // Create the task
-      if (!task.data?.title || !chatEntry.userId || !chatEntry.teamId) {
-        console.error('Missing required fields for task creation:', task.data);
-        return;
-      }
-      
-      const newTask = await createTask({
-        title: task.data.title,
-        description: task.data.description,
-        dueDate: task.data.dueDate,
-        priority: task.data.priority,
-        assignedTo: chatEntry.userId,
-        teamId: chatEntry.teamId
-      });
-      console.log('Created new task:', newTask);
-      
-      // Update local state
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === chatEntry.id
-            ? { ...msg, status: 'completed' }
-            : msg
-        )
-      );
-      
-      // Refresh tasks
-      await loadTasks();
-      console.log('Tasks refreshed after creation');
-      
-      setTaskToConfirm(null);
-      console.log('Task confirmation process completed successfully');
-    } catch (error) {
-      console.error('Error during task confirmation:', error);
-      // Revert the chat entry status on error
-      await updateChatEntry(chatEntry.id, 'pending');
-    }
-  };
+						if (msg.status === "error" || msg.error) {
+							message.isError = true;
+						}
 
-  const handleCancelTask = () => {
-    setTaskToConfirm(null);
-  };
+						return message;
+					});
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Simple Subscription Status */}
-        <Card className="p-4 col-span-full">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-blue-600" />
-              <div>
-                <h2 className="font-medium">
-                  {team?.subscriptionStatus === 'active' ? 'Active Plan' : 'Free Plan'}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  {team?.planName || 'Basic Features'}
-                </p>
-              </div>
-            </div>
-            {team?.subscriptionStatus !== 'active' && (
-              <Button>Upgrade Plan</Button>
-            )}
-          </div>
-        </Card>
+					setMessages(formattedMessages);
+					lastMessageCount = history.length;
+					lastMessageUpdate = new Date();
+				}
+			} catch (error) {
+				console.error("Error checking for updates:", error);
+			}
+		};
 
-        {/* AI Chat Section - More Compact */}
-        <div className="lg:col-span-2">
-          <h2 className="text-2xl font-semibold mb-4">Family AI Assistant</h2>
-          <div className="rounded-lg border bg-white shadow-sm p-4 h-[400px]">
-            <Chat
-              messages={messages.map(msg => ({
-                role: msg.role as 'user' | 'assistant' | 'system',
-                content: msg.message,
-                timestamp: msg.timestamp,
-                action: msg.action as ChatAction
-              }))}
-              onSendMessage={handleSendMessage}
-              onConfirmTask={handleConfirmTask}
-              onCancelTask={handleCancelTask}
-              taskToConfirm={taskToConfirm}
-            />
-          </div>
-        </div>
+		// Check for updates every 5 seconds
+		const intervalId = setInterval(checkForUpdates, 5000);
 
-        {/* Important Dates & Events */}
-        <Card className="p-4">
-          <h3 className="font-medium mb-2">Important Dates</h3>
-          <p className="text-sm text-gray-500">No upcoming events</p>
-        </Card>
+		// Clean up the interval when the component unmounts
+		return () => clearInterval(intervalId);
+	}, [team, messages]);
 
-        {/* Family Documents */}
-        <Card className="p-4">
-          <h3 className="font-medium mb-2">Family Documents</h3>
-          <p className="text-sm text-gray-500">No documents uploaded</p>
-        </Card>
+	const loadChatHistory = async () => {
+		if (!team) return;
+		try {
+			const history = await getChatHistory(team.id.toString());
+			console.log("Loaded chat history:", history);
 
-        {/* Tasks & Reminders */}
-        <Card className="p-4">
-          <h3 className="font-medium mb-2">Tasks & Reminders</h3>
-          {tasks.length > 0 ? (
-            <div className="space-y-2">
-              {tasks.map((task) => (
-                <div key={task.id} className="flex items-start gap-2 p-2 rounded-lg bg-gray-50">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{task.title}</p>
-                    {task.description && (
-                      <p className="text-xs text-gray-500 mt-1">{task.description}</p>
-                    )}
-                    {task.dueDate && (
-                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                        <Clock className="h-3 w-3" />
-                        <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      task.priority === 'high' ? 'bg-red-100 text-red-700' :
-                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>
-                      {task.priority}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      task.status === 'completed' ? 'bg-green-100 text-green-700' :
-                      task.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {task.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">No tasks assigned</p>
-          )}
-        </Card>
+			// Create a new array of messages with proper formatting
+			const formattedMessages = history.map((msg) => {
+				const message: ChatMessage = {
+					role:
+						msg.role === "system"
+							? "assistant"
+							: (msg.role as "user" | "assistant"),
+					content: msg.message,
+					timestamp: new Date(msg.timestamp),
+				};
 
-        {/* Family Memories */}
-        <Card className="p-4">
-          <h3 className="font-medium mb-2">Family Memories</h3>
-          <p className="text-sm text-gray-500">No memories added</p>
-        </Card>
-      </div>
-    </div>
-  );
-} 
+				// Add error status if message has an error
+				if (msg.status === "error" || msg.error) {
+					message.isError = true;
+				}
+
+				return message;
+			});
+
+			// Force a state update with the new array
+			setMessages([...formattedMessages]);
+		} catch (error) {
+			console.error("Error loading chat history:", error);
+			setError("Failed to load chat history");
+		}
+	};
+
+	const handleSendMessage = async (message: string) => {
+		if (!team) return;
+
+		// Clear any previous errors
+		setError(null);
+
+		try {
+			setIsLoading(true);
+
+			// Add the user's message immediately for better UX
+			const userMessage: ChatMessage = {
+				role: "user",
+				content: message,
+				timestamp: new Date(),
+			};
+
+			setMessages((prev) => [...prev, userMessage]);
+
+			// Send the message to the API
+			const response = await fetch("/api/chat", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					message,
+					context: {
+						teamId: team.id,
+					},
+				}),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(
+					errorData.error || `Failed to send message: ${response.status}`
+				);
+			}
+
+			const data = await response.json();
+
+			// Add the AI's response
+			const aiMessage: ChatMessage = {
+				role: "assistant",
+				content: data.message,
+				timestamp: new Date(),
+			};
+
+			// Use a function to update state to ensure we're working with the latest state
+			setMessages((prevMessages) => {
+				// Filter out any temporary messages
+				const filteredMessages = prevMessages.filter(
+					(m) =>
+						!(
+							m.role === "user" &&
+							m.content === message &&
+							// Check if timestamps are close (within 5 seconds)
+							Math.abs(
+								m.timestamp.getTime() - userMessage.timestamp.getTime()
+							) < 5000
+						)
+				);
+
+				// Return a new array with the user message and AI response
+				return [...filteredMessages, userMessage, aiMessage];
+			});
+
+			// Force a re-render by updating the lastUpdate timestamp
+			setLastUpdate(new Date());
+
+			// Force a refresh of the chat history after a short delay
+			setTimeout(() => {
+				loadChatHistory();
+			}, 500);
+		} catch (error) {
+			console.error("Error sending message:", error);
+
+			// Add an error message to the chat
+			const errorMessage: ChatMessage = {
+				role: "assistant",
+				content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`,
+				timestamp: new Date(),
+				isError: true,
+			};
+
+			// Use a function to update state to ensure we're working with the latest state
+			setMessages((prevMessages) => {
+				// Return a new array with the error message added
+				return [...prevMessages, errorMessage];
+			});
+
+			// Force a re-render
+			setLastUpdate(new Date());
+
+			// Refresh data after an error to ensure UI is up-to-date
+			loadChatHistory();
+
+			setError("Failed to process your message. Please try again.");
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	return (
+		<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+				{/* Simple Subscription Status */}
+				<Card className="p-4 col-span-full">
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							<CreditCard className="h-5 w-5 text-blue-600" />
+							<div>
+								<h2 className="font-medium">
+									{team?.subscriptionStatus === "active"
+										? "Active Plan"
+										: "Free Plan"}
+								</h2>
+								<p className="text-sm text-gray-500">
+									{team?.planName || "Basic Features"}
+								</p>
+							</div>
+						</div>
+						{team?.subscriptionStatus !== "active" && (
+							<Button>Upgrade Plan</Button>
+						)}
+					</div>
+				</Card>
+
+				{/* AI Chat Section - More Compact */}
+				<div className="lg:col-span-2">
+					<div className="flex justify-between items-center mb-4">
+						<h2 className="text-2xl font-semibold">Family AI Assistant</h2>
+					</div>
+
+					{error && (
+						<Alert variant="destructive" className="mb-4">
+							<AlertCircle className="h-4 w-4" />
+							<AlertTitle>Error</AlertTitle>
+							<AlertDescription>{error}</AlertDescription>
+						</Alert>
+					)}
+
+					<div className="rounded-lg border bg-white shadow-sm p-4 h-[400px]">
+						<Chat
+							messages={messages}
+							isLoading={isLoading}
+							onSendMessage={handleSendMessage}
+						/>
+					</div>
+				</div>
+
+				{/* Important Dates & Events */}
+				<Card className="p-4">
+					<h3 className="font-medium mb-2">Important Dates</h3>
+					<p className="text-sm text-gray-500">No upcoming events</p>
+				</Card>
+
+				{/* Family Documents */}
+				<Card className="p-4">
+					<h3 className="font-medium mb-2">Family Documents</h3>
+					<p className="text-sm text-gray-500">No documents uploaded</p>
+				</Card>
+
+				{/* Tasks & Reminders */}
+				<Card className="p-4">
+					<h3 className="font-medium mb-2">Tasks & Reminders</h3>
+					<p className="text-sm text-gray-500">No tasks assigned</p>
+				</Card>
+
+				{/* Family Memories */}
+				<Card className="p-4">
+					<h3 className="font-medium mb-2">Family Memories</h3>
+					<p className="text-sm text-gray-500">No memories added</p>
+				</Card>
+			</div>
+		</div>
+	);
+}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResourceAction } from '../resources/base/types';
 
 // Core chat types
 export type ChatMessage = {
@@ -6,6 +7,10 @@ export type ChatMessage = {
   content: string;
   timestamp: Date;
   display_data?: any;
+  action?: ChatAction;
+  isError?: boolean;
+  isLoading?: boolean;
+  requiresConfirmation?: boolean;
 };
 
 export type MessageState = {
@@ -14,18 +19,26 @@ export type MessageState = {
   isLoading: boolean;
 };
 
-export type AIResponse = {
+export interface AIResponse {
   system: {
     metadata: Record<string, any>;
-    db_action?: {
-      query: string;
-      params?: any[];
-      metadata?: Record<string, any>;
-    };
+    db_action?: ResourceAction;
   };
   user: {
     message: string;
-    display_data?: any;
+  };
+  tokensUsed?: number;
+}
+
+export type ChatAction = {
+  type: 'execute_sql';
+  data: {
+    query: string;
+    params?: any[];
+  };
+  metadata?: {
+    requires_confirmation: boolean;
+    action: string;
   };
 };
 
@@ -46,4 +59,4 @@ export const TaskSchema = z.object({
   deletedAt: z.date().nullable()
 });
 
-export type Task = z.infer<typeof TaskSchema>; 
+export type Task = z.infer<typeof TaskSchema>;
