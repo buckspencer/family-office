@@ -26,20 +26,7 @@ export interface ResourceManager<T extends BaseResource> {
 }
 
 // Resource action types
-export type ResourceAction = {
-  type: 'execute_sql';
-  data: {
-    query: string;
-    params?: any[];
-  };
-  metadata?: {
-    requires_confirmation: boolean;
-    action: string;
-  };
-};
+// DELETED: export type ResourceAction = { ... };
 
 // AI response type
-export interface AIResponse {
-  message: string;
-  action?: ResourceAction;
-} 
+// DELETED: export interface AIResponse { ... }; 
