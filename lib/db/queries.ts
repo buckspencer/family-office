@@ -2,7 +2,7 @@ import { desc, and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from "./drizzle";
 import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/session';
+import { verifyToken } from '@/lib/auth/tokens';
 import { TeamDataWithMembers } from "../types";
 
 export async function getUser() {

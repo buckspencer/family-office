@@ -9,7 +9,12 @@ export default async function DashboardPage() {
   }
 
   const userWithTeam = await getUserWithTeam(user.id);
-  const team = userWithTeam?.team;
+  const teamData = userWithTeam?.team ? {
+    id: userWithTeam.team.id,
+    name: userWithTeam.team.name,
+    subscriptionStatus: userWithTeam.team.subscriptionStatus,
+    planName: userWithTeam.team.planName,
+  } : null;
 
-  return <DashboardContent team={team} />;
+  return <DashboardContent team={teamData} />;
 }

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/drizzle';
 import { users, teams, teamMembers } from '@/lib/db/schema';
-import { setSession } from '@/lib/auth/session';
+import { setSession } from '@/app/lib/auth/session';
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/payments/stripe';
 import Stripe from 'stripe';
@@ -80,11 +80,11 @@ export async function GET(request: NextRequest) {
       .update(teams)
       .set({
         stripeCustomerId: customerId,
-        stripeSubscriptionId: subscriptionId,
-        stripeProductId: productId,
+        stripeSubscriptionId: subscription.id,
+        stripeProductId: plan.product as string,
         planName: (plan.product as Stripe.Product).name,
         subscriptionStatus: subscription.status,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(teams.id, userTeam.teamId));
 

@@ -236,31 +236,6 @@ export const familySubscriptions = pgTable('family_subscriptions', {
   }),
 ]);
 
-export const familyAIChats = pgTable('family_ai_chats', {
-  id: serial().primaryKey().notNull(),
-  teamId: uuid('team_id').notNull(),
-  userId: uuid('user_id').notNull(),
-  message: text('message').notNull(),
-  role: text('role').notNull(),
-  timestamp: timestamp({ mode: 'string' }).defaultNow().notNull(),
-  action: jsonb(),
-  response: text('response'),
-  status: text('status').default('pending'),
-  error: text('error'),
-  deletedAt: timestamp('deleted_at', { mode: 'string' }),
-}, (table) => [
-  foreignKey({
-    columns: [table.teamId],
-    foreignColumns: [teams.id],
-    name: 'family_ai_chats_team_id_teams_id_fk'
-  }).onDelete('cascade'),
-  foreignKey({
-    columns: [table.userId],
-    foreignColumns: [users.id],
-    name: 'family_ai_chats_user_id_users_id_fk'
-  }).onDelete('cascade'),
-]);
-
 export const familyMemories = pgTable('family_memories', {
   id: serial().primaryKey().notNull(),
   teamId: uuid('team_id').notNull(),
@@ -504,16 +479,41 @@ export type FamilyDate = typeof familyDates.$inferSelect;
 export type NewFamilyDate = typeof familyDates.$inferInsert;
 export type FamilySubscription = typeof familySubscriptions.$inferSelect;
 export type NewFamilySubscription = typeof familySubscriptions.$inferInsert;
-export type FamilyAIChat = typeof familyAIChats.$inferSelect;
-export type NewFamilyAIChat = typeof familyAIChats.$inferInsert;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type NewActivityLog = typeof activityLogs.$inferInsert;
 export type ActivityType = typeof activityTypeEnum.enumValues[number];
 export type ActionLog = typeof actionLogs.$inferSelect;
 export type NewActionLog = typeof actionLogs.$inferInsert;
 
-export type TeamDataWithMembers = Team & {
-  teamMembers: (TeamMember & {
-    user: Pick<User, 'id' | 'name' | 'email'>;
-  })[];
+export type TeamDataWithMembers = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeProductId: string | null;
+  planName: string | null;
+  subscriptionStatus: string | null;
+  trialEndsAt: string | null;
+  subscriptionEndsAt: string | null;
+  deletedAt: string | null;
+  createdBy: string | null;
+  updatedBy: string | null;
+  teamMembers: {
+    id: number;
+    role: string;
+    createdAt: string;
+    updatedAt: string;
+    deletedAt: string | null;
+    createdBy: string | null;
+    updatedBy: string | null;
+    userId: string;
+    teamId: string;
+    user: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
+  }[];
 };

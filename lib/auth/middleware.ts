@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { TeamDataWithMembers, User } from '@/lib/db/schema';
+import { User } from '@/lib/db/schema';
+import { TeamDataWithMembers } from '@/lib/types';
 import { getTeamForUser, getUser } from '@/lib/db/queries';
 import { redirect } from 'next/navigation';
 

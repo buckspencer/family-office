@@ -18,7 +18,8 @@ import {
   userRoleEnum,
   type ActivityType,
 } from '@/lib/db/schema';
-import { comparePasswords, hashPassword, setSession } from '@/lib/auth/session';
+import { comparePasswords, hashPassword } from '@/lib/auth/utils';
+import { setSession } from '@/app/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createCheckoutSession } from '@/lib/payments/stripe';
@@ -31,9 +32,9 @@ import { generateVerificationToken, generateTokenExpiry } from '@/lib/auth/token
 import { sendVerificationEmail, sendInvitationEmail } from '@/lib/email/service';
 
 async function logActivity(
-  teamId: number | null | undefined,
+  teamId: string | null | undefined,
   userId: string,
-  type: typeof activityTypeEnum.enumValues[number],
+  type: ActivityType,
   ipAddress?: string,
 ) {
   if (teamId === null || teamId === undefined) {
@@ -156,7 +157,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     token: verificationToken,
   });
 
-  let teamId: number;
+  let teamId: string;
   let userRole: string;
   let createdTeam: typeof teams.$inferSelect | null = null;
 
@@ -217,22 +218,26 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     await logActivity(teamId, createdUser.id, 'CREATE_TEAM');
   }
 
+  // Create team member
   const newTeamMember: NewTeamMember = {
     userId: createdUser.id,
-    teamId: teamId,
-    role: userRole as typeof userRoleEnum.enumValues[number],
+    teamId,
+    role: userRole,
     createdBy: createdUser.id,
     updatedBy: createdUser.id,
   };
 
-  await Promise.all([
-    db.insert(teamMembers).values(newTeamMember),
-    logActivity(teamId, createdUser.id, 'SIGN_UP'),
-    setSession(createdUser),
-  ]);
+  await db.insert(teamMembers).values(newTeamMember);
 
-  // Instead of redirecting to dashboard, redirect to verify-prompt
-  redirect('/verify-prompt');
+  await setSession(createdUser);
+
+  const redirectTo = formData.get('redirect') as string | null;
+  if (redirectTo === 'checkout') {
+    const priceId = formData.get('priceId') as string;
+    return createCheckoutSession({ team: createdTeam, priceId });
+  }
+
+  redirect('/dashboard');
 });
 
 export const signOut = async () => {
@@ -447,7 +452,7 @@ export const inviteTeamMember = validatedActionWithUser(
         role: role as typeof userRoleEnum.enumValues[number],
         invitedBy: user.id,
         status: 'pending',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
       })
       .returning();
 

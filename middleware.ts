@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { signToken, verifyToken } from '@/lib/auth/session';
+import { signToken, verifyToken } from '@/lib/auth/tokens';
 
 const protectedRoutes = '/dashboard';
 const publicRoutes = ['/sign-in', '/sign-up', '/verify-email', '/verify-prompt'];
@@ -32,6 +32,11 @@ export async function middleware(request: NextRequest) {
   if (sessionCookie && request.method === "GET") {
     try {
       const parsed = await verifyToken(sessionCookie.value);
+      if (!parsed) {
+        res.cookies.delete('session');
+        return res;
+      }
+
       const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       // Check email verification status for protected routes
@@ -42,7 +47,7 @@ export async function middleware(request: NextRequest) {
       res.cookies.set({
         name: 'session',
         value: await signToken({
-          ...parsed,
+          user: parsed.user,
           expires: expiresInOneDay.toISOString(),
         }),
         httpOnly: true,
@@ -51,11 +56,8 @@ export async function middleware(request: NextRequest) {
         expires: expiresInOneDay,
       });
     } catch (error) {
-      console.error('Error updating session:', error);
+      // If token verification fails, clear the session
       res.cookies.delete('session');
-      if (isProtectedRoute) {
-        return NextResponse.redirect(new URL('/sign-in', request.url));
-      }
     }
   }
 
@@ -63,5 +65,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 };

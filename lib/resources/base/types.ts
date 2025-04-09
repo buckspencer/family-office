@@ -10,7 +10,11 @@ export const BaseResourceSchema = z.object({
   updatedAt: z.date(),
   createdBy: z.string().uuid(),
   type: z.string(),
-  status: z.string()
+  status: z.string(),
+  data: z.object({
+    query: z.string(),
+    params: z.array(z.any()).optional()
+  })
 });
 
 export type BaseResource = z.infer<typeof BaseResourceSchema>;

@@ -10,7 +10,7 @@ import { FamilySubscription } from "@/lib/db/schema";
 
 interface DashboardContentProps {
 	team: {
-		id: number;
+		id: string;
 		name: string;
 		subscriptionStatus: string | null;
 		planName: string | null;

@@ -4,7 +4,7 @@ import 'server-only'; // Ensures this module runs only on the server
 import { z } from 'zod';
 import { db } from '@/lib/db/drizzle';
 import { familySubscriptions, NewFamilySubscription, TeamDataWithMembers } from '@/lib/db/schema';
-import { getSession } from '@/lib/auth/session'; // Removed validateSession import
+import { getSession } from '@/app/lib/auth/session'; // Removed validateSession import
 import { eq, and, isNull } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { getTeamForUser } from '@/lib/db/queries';
