@@ -9,7 +9,7 @@ interface CreateResourceButtonProps {
 export function CreateResourceButton({ resource }: CreateResourceButtonProps) {
   return (
     <Button asChild>
-      <Link href={`/dashboard/family/${resource}/create`}>
+      <Link href={`/dashboard/family/${resource}/create/page`}>
         <Plus className="mr-2 h-4 w-4" />
         Create {resource.split('/').pop()}
       </Link>

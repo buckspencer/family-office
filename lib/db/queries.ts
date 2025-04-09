@@ -1,8 +1,9 @@
-import { desc, and, eq, isNull } from 'drizzle-orm';
-import { db } from './drizzle';
+import { desc, and, eq, isNull, sql } from 'drizzle-orm';
+import { db } from "./drizzle";
 import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/session';
+import { TeamDataWithMembers } from "../types";
 
 export async function getUser() {
   const sessionCookie = (await cookies()).get('session');
@@ -47,7 +48,7 @@ export async function getTeamByStripeCustomerId(customerId: string) {
 }
 
 export async function updateTeamSubscription(
-  teamId: number,
+  teamId: string,
   subscriptionData: {
     stripeSubscriptionId: string | null;
     stripeProductId: string | null;
@@ -59,7 +60,7 @@ export async function updateTeamSubscription(
     .update(teams)
     .set({
       ...subscriptionData,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(eq(teams.id, teamId));
 }
@@ -101,31 +102,50 @@ export async function getActivityLogs() {
     .limit(10);
 }
 
-export async function getTeamForUser(userId: string) {
-  const result = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    with: {
-      teamMembers: {
-        with: {
-          team: {
-            with: {
-              teamMembers: {
-                with: {
-                  user: {
-                    columns: {
-                      id: true,
-                      name: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+export async function getTeamForUser(userId: string): Promise<TeamDataWithMembers | null> {
+  const teamMember = await db.query.teamMembers.findFirst({
+    where: eq(teamMembers.userId, userId),
+    columns: {
+      teamId: true
+    }
   });
 
-  return result?.teamMembers[0]?.team || null;
+  if (!teamMember) {
+    return null;
+  }
+
+  const team = await db.query.teams.findFirst({
+    where: eq(teams.id, teamMember.teamId),
+    with: {
+      members: {
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return team || null;
+}
+
+export async function getCurrentTeamId(userId: string): Promise<string | null> {
+  try {
+    const teamMember = await db.query.teamMembers.findFirst({
+      where: eq(teamMembers.userId, userId),
+      columns: {
+        teamId: true
+      }
+    });
+
+    return teamMember?.teamId || null;
+  } catch (error) {
+    console.error('Error getting current team ID:', error);
+    return null;
+  }
 }

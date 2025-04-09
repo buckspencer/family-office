@@ -30,7 +30,9 @@ export function ResourceForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(formData)
+    // Create a copy of the form data to avoid mutating the state
+    const dataToSubmit = { ...formData }
+    onSubmit(dataToSubmit)
   }
 
   const handleChange = (
