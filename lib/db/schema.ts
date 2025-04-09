@@ -56,6 +56,12 @@ export const users = pgTable('users', {
   updatedBy: uuid('updated_by').references((): any => users.id),
 });
 
+export const usersRelations = relations(users, ({ many, one }) => ({
+  teamMembers: many(teamMembers),
+  createdTeams: many(teams, { relationName: 'createdBy' }),
+  updatedTeams: many(teams, { relationName: 'updatedBy' }),
+}));
+
 export const teams = pgTable('teams', {
   id: uuid('id').defaultRandom().primaryKey().notNull(),
   name: varchar('name', { length: 100 }).notNull(),
@@ -86,6 +92,20 @@ export const teams = pgTable('teams', {
   unique('teams_stripe_subscription_id_unique').on(table.stripeSubscriptionId),
 ]);
 
+export const teamsRelations = relations(teams, ({ many, one }) => ({
+  members: many(teamMembers),
+  createdByUser: one(users, {
+    fields: [teams.createdBy],
+    references: [users.id],
+    relationName: 'createdBy'
+  }),
+  updatedByUser: one(users, {
+    fields: [teams.updatedBy],
+    references: [users.id],
+    relationName: 'updatedBy'
+  })
+}));
+
 export const teamMembers = pgTable('team_members', {
   id: serial().primaryKey().notNull(),
   userId: uuid('user_id').notNull(),
@@ -98,26 +118,47 @@ export const teamMembers = pgTable('team_members', {
   updatedBy: uuid('updated_by'),
 }, (table) => [
   foreignKey({
-    columns: [table.createdBy],
+    columns: [table.userId],
     foreignColumns: [users.id],
-    name: 'team_members_created_by_users_id_fk'
+    name: 'team_members_user_id_fk'
   }),
   foreignKey({
     columns: [table.teamId],
     foreignColumns: [teams.id],
-    name: 'team_members_team_id_teams_id_fk'
-  }).onDelete('cascade'),
+    name: 'team_members_team_id_fk'
+  }),
+  foreignKey({
+    columns: [table.createdBy],
+    foreignColumns: [users.id],
+    name: 'team_members_created_by_fk'
+  }),
   foreignKey({
     columns: [table.updatedBy],
     foreignColumns: [users.id],
-    name: 'team_members_updated_by_users_id_fk'
-  }),
-  foreignKey({
-    columns: [table.userId],
-    foreignColumns: [users.id],
-    name: 'team_members_user_id_users_id_fk'
-  }).onDelete('cascade'),
+    name: 'team_members_updated_by_fk'
+  })
 ]);
+
+export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
+  user: one(users, {
+    fields: [teamMembers.userId],
+    references: [users.id]
+  }),
+  team: one(teams, {
+    fields: [teamMembers.teamId],
+    references: [teams.id]
+  }),
+  createdByUser: one(users, {
+    fields: [teamMembers.createdBy],
+    references: [users.id],
+    relationName: 'createdBy'
+  }),
+  updatedByUser: one(users, {
+    fields: [teamMembers.updatedBy],
+    references: [users.id],
+    relationName: 'updatedBy'
+  })
+}));
 
 export const activityLogs = pgTable('activity_logs', {
   id: serial().primaryKey().notNull(),
@@ -410,44 +451,35 @@ export const actionLogs = pgTable('action_logs', {
   }).onDelete('cascade'),
 ]);
 
-// Relations
-export const usersRelations = relations(users, ({ many }) => ({
-  teamMembers: many(teamMembers),
-  createdTasks: many(familyTasks, { relationName: 'createdTasks' }),
-  assignedTasks: many(familyTasks, { relationName: 'assignedTasks' }),
-  createdDocuments: many(familyDocuments),
-  createdEvents: many(familyEvents),
-  createdMemories: many(familyMemories),
-  createdInformation: many(familyInformation),
-  createdDates: many(familyDates),
-  createdSubscriptions: many(familySubscriptions),
-  createdAIChats: many(familyAIChats),
-  createdTeams: many(teams, { relationName: 'createdTeams' }),
-  updatedTeams: many(teams, { relationName: 'updatedTeams' }),
+export const families = pgTable('families', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const subscriptions = pgTable('subscriptions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  familyId: uuid('family_id').references(() => families.id).notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  billingCycle: text('billing_cycle').notNull(), // monthly, quarterly, yearly
+  startDate: timestamp('start_date').notNull(),
+  endDate: timestamp('end_date'),
+  status: text('status').notNull().default('active'), // active, cancelled, paused
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const familiesRelations = relations(families, ({ many }) => ({
+  subscriptions: many(subscriptions),
 }));
 
-export const teamsRelations = relations(teams, ({ many }) => ({
-  members: many(teamMembers),
-  tasks: many(familyTasks),
-  documents: many(familyDocuments),
-  events: many(familyEvents),
-  memories: many(familyMemories),
-  information: many(familyInformation),
-  dates: many(familyDates),
-  subscriptions: many(familySubscriptions),
-  aiChats: many(familyAIChats),
-  createdBy: many(users, { relationName: 'createdTeams' }),
-  updatedBy: many(users, { relationName: 'updatedTeams' }),
-}));
-
-export const actionLogsRelations = relations(actionLogs, ({ one }) => ({
-  team: one(teams, {
-    fields: [actionLogs.teamId],
-    references: [teams.id]
-  }),
-  user: one(users, {
-    fields: [actionLogs.userId],
-    references: [users.id]
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  family: one(families, {
+    fields: [subscriptions.familyId],
+    references: [families.id]
   })
 }));
 
