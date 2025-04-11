@@ -20,15 +20,16 @@ import { comparePasswords, hashPassword, setSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createCheckoutSession } from '@/lib/payments/stripe';
-import { getUser, getUserWithTeam } from '@/lib/db/queries';
+import { getUser, getUserWithTeam, getTeamForUser } from '@/lib/db/queries';
 import {
   validatedAction,
   validatedActionWithUser,
 } from '@/lib/auth/middleware';
+import { sendTeamInvitationEmail } from '@/lib/emails';
 
 async function logActivity(
-  teamId: number | null | undefined,
-  userId: number,
+  teamId: string | null | undefined,
+  userId: string,
   type: ActivityType,
   ipAddress?: string,
 ) {
@@ -141,7 +142,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     };
   }
 
-  let teamId: number;
+  let teamId: string;
   let userRole: string;
   let createdTeam: typeof teams.$inferSelect | null = null;
 
@@ -152,7 +153,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
       .from(invitations)
       .where(
         and(
-          eq(invitations.id, parseInt(inviteId)),
+          eq(invitations.id, inviteId),
           eq(invitations.email, email),
           eq(invitations.status, 'pending'),
         ),
@@ -223,8 +224,8 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
 
 export async function signOut() {
   const user = (await getUser()) as User;
-  const userWithTeam = await getUserWithTeam(user.id);
-  await logActivity(userWithTeam?.teamId, user.id, ActivityType.SIGN_OUT);
+  const team = await getTeamForUser(user.id);
+  await logActivity(team?.id, user.id, ActivityType.SIGN_OUT);
   (await cookies()).delete('session');
 }
 
@@ -342,7 +343,7 @@ export const updateAccount = validatedActionWithUser(
 );
 
 const removeTeamMemberSchema = z.object({
-  memberId: z.number(),
+  memberId: z.string(),
 });
 
 export const removeTeamMember = validatedActionWithUser(
@@ -383,9 +384,9 @@ export const inviteTeamMember = validatedActionWithUser(
   inviteTeamMemberSchema,
   async (data, _, user) => {
     const { email, role } = data;
-    const userWithTeam = await getUserWithTeam(user.id);
+    const team = await getTeamForUser(user.id);
 
-    if (!userWithTeam?.teamId) {
+    if (!team) {
       return { error: 'User is not part of a team' };
     }
 
@@ -396,7 +397,7 @@ export const inviteTeamMember = validatedActionWithUser(
       .where(
         and(
           eq(users.email, email),
-          eq(teamMembers.teamId, userWithTeam.teamId),
+          eq(teamMembers.teamId, team.id),
         ),
       )
       .limit(1);
@@ -412,7 +413,7 @@ export const inviteTeamMember = validatedActionWithUser(
       .where(
         and(
           eq(invitations.email, email),
-          eq(invitations.teamId, userWithTeam.teamId),
+          eq(invitations.teamId, team.id),
           eq(invitations.status, 'pending'),
         ),
       )
@@ -423,22 +424,32 @@ export const inviteTeamMember = validatedActionWithUser(
     }
 
     // Create a new invitation
-    await db.insert(invitations).values({
-      teamId: userWithTeam.teamId,
-      email,
-      role,
-      invitedBy: user.id,
-      status: 'pending',
-    });
+    const [invitation] = await db
+      .insert(invitations)
+      .values({
+        teamId: team.id,
+        email,
+        role,
+        invitedBy: user.id,
+        status: 'pending',
+      })
+      .returning();
 
     await logActivity(
-      userWithTeam.teamId,
+      team.id,
       user.id,
       ActivityType.INVITE_TEAM_MEMBER,
     );
 
-    // TODO: Send invitation email and include ?inviteId={id} to sign-up URL
-    // await sendInvitationEmail(email, userWithTeam.team.name, role)
+    // Send invitation email
+    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/sign-up?inviteId=${invitation.id}`;
+    await sendTeamInvitationEmail({
+      to: email,
+      teamName: team.name,
+      inviterName: user.name || user.email,
+      inviteLink,
+      role,
+    });
 
     return { success: 'Invitation sent successfully' };
   },
