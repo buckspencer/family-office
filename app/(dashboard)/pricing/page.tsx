@@ -2,11 +2,14 @@ import { checkoutAction } from '@/lib/payments/actions';
 import { Check } from 'lucide-react';
 import { getStripePrices, getStripeProducts } from '@/lib/payments/stripe';
 import { SubmitButton } from './submit-button';
+import { unstable_noStore as noStore } from 'next/cache';
 
 // Prices are fresh for one hour max
 export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 export default async function PricingPage() {
+  noStore();
   const [prices, products] = await Promise.all([
     getStripePrices(),
     getStripeProducts(),
