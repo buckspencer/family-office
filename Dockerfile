@@ -9,12 +9,12 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ARG POSTGRES_URL
-ARG STRIPE_SECRET_KEY
-ARG STRIPE_WEBHOOK_SECRET
-ENV POSTGRES_URL=${POSTGRES_URL}
-ENV STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}
-ENV STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+ENV POSTGRES_URL=postgres://placeholder:placeholder@localhost:5432/placeholder
+ENV STRIPE_SECRET_KEY=sk_test_placeholder
+ENV STRIPE_WEBHOOK_SECRET=whsec_placeholder
+ENV AUTH_SECRET=placeholder
+ENV BASE_URL=https://placeholder.example.com
+ENV NEXT_PUBLIC_APP_URL=https://placeholder.example.com
 RUN pnpm build
 
 FROM node:20-alpine AS runner
